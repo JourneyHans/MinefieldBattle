@@ -31,15 +31,9 @@
 ## 🛠️ 技术实现
 
 ### 系统架构
-- **CharacterClass.cs** - 职业兵种系统
-- **MonsterSystem.cs** - 怪物系统
-- **MagicLegionMinesweeper.cs** - 游戏核心逻辑
-- **MagicLegionGameManager.cs** - 游戏管理器
-- **MagicLegionGameUI.cs** - UI系统
-- **MagicLegionGameLauncher.cs** - 游戏启动器
+TODO
 
 ### 核心特性
-- 基于TEngine框架的模块化设计
 - 事件驱动的游戏状态管理
 - 内存池优化的对象管理
 - 可配置的游戏设置系统
@@ -58,67 +52,6 @@
 - 职业特色颜色系统
 - 怪物类型视觉区分
 - 战斗特效和反馈
-
-## 🚀 使用方法
-
-### 1. 初始化游戏系统
-```csharp
-// 在游戏启动时调用
-MagicLegionGameLauncher.Initialize();
-```
-
-### 2. 启动游戏
-```csharp
-// 开始新游戏
-MagicLegionGameLauncher.StartGame();
-```
-
-### 3. 获取游戏管理器
-```csharp
-var gameManager = ModuleSystem.GetModule<MagicLegionGameManager>();
-```
-
-### 4. 游戏操作
-```csharp
-// 点击格子
-gameManager.ClickCell(x, y);
-
-// 标记格子
-gameManager.FlagCell(x, y);
-
-// 暂停/恢复游戏
-gameManager.PauseGame();
-gameManager.ResumeGame();
-```
-
-## 🎨 UI组件
-
-### 必需UI组件
-- **GameCellUI** - 游戏格子UI组件
-- **MagicLegionGameUI** - 主游戏界面
-- **GridLayoutGroup** - 网格布局组件
-
-### UI功能
-- 实时显示游戏状态
-- 血量、分数、时间显示
-- 游戏控制按钮
-- 胜利/失败界面
-- 暂停菜单
-
-## ⚙️ 配置选项
-
-### 游戏设置
-```csharp
-GameSettings settings = new GameSettings
-{
-    gridWidth = 10,        // 网格宽度
-    gridHeight = 10,       // 网格高度
-    monsterCount = 15,     // 怪物数量
-    playerMaxHealth = 100, // 玩家最大血量
-    enableSound = true,    // 启用音效
-    enableMusic = true     // 启用音乐
-};
-```
 
 ## 🔧 扩展建议
 
