@@ -2,21 +2,49 @@
 
 ## 运行说明
 
-### 环境要求
+### 方式一：直接运行（需要Python环境）
+
+#### 环境要求
 - Python 3.6+
 - Pygame 2.0.0+
 
-### 安装依赖
+#### 安装依赖
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 运行游戏
+#### 运行游戏
 
 ```bash
 python main.py
 ```
+
+### 方式二：打包后运行（无需Python环境）
+
+#### Windows系统
+
+1. **使用批处理脚本（推荐）**
+   - 双击运行 `build.bat`
+   - 等待打包完成
+   - 在 `dist` 目录找到 `魔法军团地雷战场.exe`，双击运行
+
+2. **手动打包**
+   ```bash
+   pip install pyinstaller
+   pyinstaller --onefile --windowed --name "MinefieldBattle" --hidden-import=pygame --collect-all pygame main.py
+   # 打包后文件名为 MinefieldBattle.exe，可手动重命名为中文名称
+   ```
+
+#### Linux/Mac系统
+
+```bash
+pip3 install pyinstaller
+pyinstaller --onefile --windowed --name "MinefieldBattle" --hidden-import=pygame --collect-all pygame main.py
+# 打包后文件名为 MinefieldBattle，可手动重命名为中文名称
+```
+
+详细打包说明请查看 `打包说明.md`
 
 ## 游戏操作
 
