@@ -1,4 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
+# 调试版本 - 显示控制台窗口以便查看错误信息
 from PyInstaller.utils.hooks import collect_all, collect_submodules, collect_data_files
 import os
 
@@ -26,7 +27,7 @@ try:
 except Exception as e:
     print(f"Warning: collect_submodules('pygame') failed: {e}")
 
-# 方法3: 显式添加 pygame 核心模块（确保关键模块被包含）
+# 方法3: 显式添加 pygame 核心模块
 pygame_core_modules = [
     'pygame',
     'pygame.base',
@@ -54,8 +55,8 @@ pygame_core_modules = [
     'pygame.time',
     'pygame.transform',
     'pygame.version',
-    'pygame._freetype',  # 字体渲染相关
-    'pygame.pkgdata',    # 包数据
+    'pygame._freetype',
+    'pygame.pkgdata',
 ]
 hiddenimports += pygame_core_modules
 
@@ -67,23 +68,10 @@ try:
 except Exception as e:
     print(f"Warning: collect_data_files('pygame') failed: {e}")
 
-# 方法5: 如果 pygame 已安装，直接获取其路径并包含
-try:
-    import pygame
-    pygame_path = os.path.dirname(pygame.__file__)
-    # 包含整个 pygame 目录（作为备选方案）
-    if os.path.exists(pygame_path):
-        # 注意：这可能会包含很多文件，但能确保完整性
-        pass  # 通常 collect_all 已经处理了
-except ImportError:
-    print("Warning: pygame not found in current environment!")
-except Exception as e:
-    print(f"Warning: Failed to get pygame path: {e}")
-
 # 去重并确保 pygame 在列表中
 hiddenimports = list(set(hiddenimports))
 if 'pygame' not in hiddenimports:
-    hiddenimports.insert(0, 'pygame')  # 确保 pygame 在最前面
+    hiddenimports.insert(0, 'pygame')
 
 
 a = Analysis(
@@ -107,17 +95,18 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='MinefieldBattle',
-    debug=False,
+    name='MinefieldBattle_debug',
+    debug=True,  # 启用调试
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,  # 调试时禁用压缩
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,
+    console=True,  # 显示控制台窗口
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
 )
+

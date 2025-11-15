@@ -63,6 +63,9 @@ class NumberCell(Cell):
         elif self.state == CellState.DEPLOYED and self.unit:
             return f"{self.number}\n{self.unit.name}"
         else:
+            # 数字为0时不显示
+            if self.number == 0:
+                return ""
             return str(self.number)
 
 
@@ -74,6 +77,7 @@ class MonsterCell(Cell):
         self.triggered = False  # 是否已触发
         self.countdown_rounds = 0  # 倒计时回合数（初始3回合）
         self.monster_power = 0  # 怪物战力（在触发时计算）
+        self.battle_won = None  # 战斗结果：True=玩家胜利，False=怪物胜利，None=未战斗
     
     def __str__(self):
         return f"MonsterCell({self.row}, {self.col})"
@@ -111,4 +115,8 @@ class MonsterCell(Cell):
     def set_monster_power(self, power):
         """设置怪物战力"""
         self.monster_power = power
+    
+    def set_battle_result(self, player_won):
+        """设置战斗结果"""
+        self.battle_won = player_won
 

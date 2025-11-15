@@ -27,13 +27,20 @@ def get_chinese_font(size):
     return pygame.font.Font(None, size)
 
 
-def draw_cell(screen, cell, x, y, active_monster):
+def draw_cell(screen, cell, x, y, game=None):
     """绘制单个格子"""
     rect = pygame.Rect(x, y, CELL_SIZE, CELL_SIZE)
     
     # 确定颜色
     if isinstance(cell, MonsterCell):
-        if cell.triggered and cell.is_countdown_active():
+        # 检查战斗结果
+        if cell.battle_won is not None:
+            # 已战斗：False=怪物胜利（红色），True=玩家胜利（灰色）
+            if cell.battle_won:  # 玩家胜利
+                color = COLOR_MONSTER_LOST
+            else:  # 怪物胜利
+                color = COLOR_MONSTER_WON
+        elif cell.triggered and cell.is_countdown_active():
             color = COLOR_COUNTDOWN
         elif cell.state == CellState.REVEALED:
             color = COLOR_MONSTER
@@ -53,22 +60,83 @@ def draw_cell(screen, cell, x, y, active_monster):
     pygame.draw.rect(screen, color, rect)
     pygame.draw.rect(screen, COLOR_TEXT, rect, 1)  # 边框
     
+    # 如果是激活的怪物，在格子上方显示倒计时数字
+    if isinstance(cell, MonsterCell) and cell.is_countdown_active():
+        countdown = cell.get_countdown_remaining()
+        if countdown > 0:
+            # 在格子上方绘制倒计时数字
+            countdown_font = get_chinese_font(20)
+            countdown_text = countdown_font.render(str(countdown), True, (255, 255, 0))  # 黄色
+            countdown_rect = countdown_text.get_rect()
+            countdown_rect.centerx = x + CELL_SIZE // 2
+            countdown_rect.centery = y - 12  # 在格子上方12像素
+            # 绘制半透明背景（圆形或圆角矩形）
+            bg_radius = max(countdown_rect.width, countdown_rect.height) // 2 + 4
+            bg_rect = pygame.Rect(countdown_rect.centerx - bg_radius, 
+                                countdown_rect.centery - bg_radius,
+                                bg_radius * 2, bg_radius * 2)
+            bg_surface = pygame.Surface((bg_rect.width, bg_rect.height), pygame.SRCALPHA)
+            pygame.draw.circle(bg_surface, (0, 0, 0, 200), (bg_radius, bg_radius), bg_radius)
+            screen.blit(bg_surface, bg_rect)
+            screen.blit(countdown_text, countdown_rect)
+    
     # 绘制文字
     if cell.is_revealed():
         text = cell.get_display_text()
         if text:
-            font = get_chinese_font(20)  # 稍微减小字体以适应更多内容
-            lines = text.split('\n')
+            lines = [l for l in text.split('\n') if l]  # 过滤空行
+            if not lines:
+                return
+            
+            # 根据格子大小和行数动态调整字体大小
+            # 格子是 50x50，留出 6 像素边距，实际可用空间是 44x44
+            available_width = CELL_SIZE - 6
+            available_height = CELL_SIZE - 6
+            
+            # 初始字体大小：根据行数计算
+            base_font_size = min(14, available_height // len(lines) - 2)
+            base_font_size = max(10, base_font_size)  # 最小字体大小 10
+            
+            # 为每一行找到合适的字体大小
+            font_sizes = []
+            for line in lines:
+                # 先尝试基础字体大小
+                test_font = get_chinese_font(base_font_size)
+                test_surface = test_font.render(line, True, COLOR_TEXT)
+                
+                # 如果宽度超出，缩小字体
+                if test_surface.get_width() > available_width:
+                    scale_factor = available_width / test_surface.get_width()
+                    font_size = max(10, int(base_font_size * scale_factor))
+                else:
+                    font_size = base_font_size
+                
+                font_sizes.append(font_size)
+            
+            # 使用最小的字体大小以确保所有行都能显示
+            final_font_size = min(font_sizes)
+            
+            # 计算行高
+            line_height = final_font_size + 2
+            total_height = len(lines) * line_height
+            
+            # 如果总高度超出，进一步缩小
+            if total_height > available_height:
+                final_font_size = (available_height - 2 * len(lines)) // len(lines)
+                final_font_size = max(10, final_font_size)
+                line_height = final_font_size + 2
+                total_height = len(lines) * line_height
+            
+            # 绘制每一行文本
+            start_y = y + CELL_SIZE // 2 - total_height // 2
+            font = get_chinese_font(final_font_size)
+            
             for i, line in enumerate(lines):
-                if line:  # 只绘制非空行
-                    text_surface = font.render(line, True, COLOR_TEXT)
-                    text_rect = text_surface.get_rect()
-                    text_rect.centerx = x + CELL_SIZE // 2
-                    # 调整垂直位置，使多行文本居中
-                    total_height = len([l for l in lines if l]) * 18
-                    start_y = y + CELL_SIZE // 2 - total_height // 2
-                    text_rect.centery = start_y + i * 18
-                    screen.blit(text_surface, text_rect)
+                text_surface = font.render(line, True, COLOR_TEXT)
+                text_rect = text_surface.get_rect()
+                text_rect.centerx = x + CELL_SIZE // 2
+                text_rect.centery = start_y + i * line_height
+                screen.blit(text_surface, text_rect)
 
 
 def draw_ui(screen, game):
@@ -117,8 +185,7 @@ def draw_ui(screen, game):
         "- 点击数字格子",
         "  可部署兵种",
         "- 触发怪物后",
-        "  只能操作相邻",
-        "  格子",
+        "  开始倒计时",
         "- 倒计时结束",
         "  自动战斗结算"
     ]
@@ -159,9 +226,16 @@ def main():
                     if 0 <= row < MAP_HEIGHT and 0 <= col < MAP_WIDTH:
                         game.click_cell(row, col)
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_r:  # 按R重新开始
+                # 按R或r重新开始游戏
+                # 检查按键码或unicode字符
+                if event.key == pygame.K_r:
                     monster_count = random.randint(MONSTER_COUNT_MIN, MONSTER_COUNT_MAX)
                     game = Game(MAP_WIDTH, MAP_HEIGHT, monster_count)
+                elif hasattr(event, 'unicode') and event.unicode:
+                    # 检查unicode字符（支持大小写）
+                    if event.unicode.lower() == 'r':
+                        monster_count = random.randint(MONSTER_COUNT_MIN, MONSTER_COUNT_MAX)
+                        game = Game(MAP_WIDTH, MAP_HEIGHT, monster_count)
         
         # 更新游戏状态
         game.update()
@@ -176,7 +250,7 @@ def main():
                 if cell:
                     x = CELL_MARGIN + col * (CELL_SIZE + CELL_MARGIN)
                     y = CELL_MARGIN + row * (CELL_SIZE + CELL_MARGIN)
-                    draw_cell(screen, cell, x, y, game.active_monster)
+                    draw_cell(screen, cell, x, y, game)
         
         # 绘制UI
         draw_ui(screen, game)
