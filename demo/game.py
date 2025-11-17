@@ -5,6 +5,8 @@
 import random
 from cell import Cell, NumberCell, MonsterCell, CellState
 from unit import Unit
+from card import Card
+from config import CARDS_PER_TURN, MAX_HAND_SIZE
 
 
 class Game:
@@ -27,7 +29,13 @@ class Game:
         self.monsters = []  # 所有怪物列表
         self.reveal_animation_queue = []  # 揭示动画队列 [(row, col, reveal_time), ...]
         
+        # 回合系统
+        self.current_turn = 1  # 当前回合数
+        self.hand = []  # 玩家手牌列表
+        
         self._generate_map()
+        # 游戏开始时发牌
+        self._deal_cards()
     
     def _generate_map(self):
         """生成地图"""
@@ -218,7 +226,7 @@ class Game:
     
     def click_cell(self, row, col):
         """
-        点击格子
+        点击格子（仅用于揭示，不再自动部署兵种）
         :param row: 行
         :param col: 列
         :return: 操作是否成功
@@ -231,23 +239,10 @@ class Game:
         
         cell = self.grid[row][col]
         
-        # 如果格子已揭示且是数字格子，尝试部署兵种
-        if cell.is_revealed() and isinstance(cell, NumberCell):
-            if not cell.has_unit() and cell.number > 0:
-                # 部署兵种
-                unit = Unit(cell.number)
-                cell.deploy_unit(unit)
-                # 消耗所有激活怪物的倒计时回合
-                self._consume_all_active_monsters_countdown()
-                return True
-        
         # 如果格子未揭示，揭示它
         if not cell.is_revealed():
             # 如果是怪物格子，触发战斗
             if isinstance(cell, MonsterCell):
-                # 先消耗所有已激活怪物的倒计时回合（在触发新怪物之前）
-                self._consume_all_active_monsters_countdown()
-                # 然后触发新怪物
                 cell.trigger()
                 # 计算怪物战力
                 adjacent_numbers = self._get_adjacent_numbers(row, col)
@@ -261,13 +256,85 @@ class Game:
                 else:
                     # 数字>0，只揭示当前格子
                     cell.reveal()
-                
-                # 消耗所有激活怪物的倒计时回合
-                self._consume_all_active_monsters_countdown()
             
             return True
         
         return False
+    
+    def deploy_card(self, card, row, col):
+        """
+        部署卡牌到指定格子
+        :param card: 要部署的卡牌
+        :param row: 行
+        :param col: 列
+        :return: 是否部署成功
+        """
+        if self.game_over:
+            return False
+        
+        if not (0 <= row < self.height and 0 <= col < self.width):
+            return False
+        
+        if card not in self.hand:
+            return False  # 卡牌不在手牌中
+        
+        cell = self.grid[row][col]
+        
+        # 只能部署到已揭示的数字格子
+        if not cell.is_revealed() or not isinstance(cell, NumberCell):
+            return False
+        
+        # 数字格子的数字必须匹配卡牌的兵种类型
+        if cell.number != card.unit_type:
+            return False
+        
+        # 格子不能已有兵种
+        if cell.has_unit():
+            return False
+        
+        # 部署兵种
+        unit = card.create_unit()
+        cell.deploy_unit(unit)
+        
+        # 从手牌移除卡牌
+        self.hand.remove(card)
+        
+        return True
+    
+    def end_turn(self):
+        """
+        结束当前回合
+        :return: 是否成功结束回合
+        """
+        if self.game_over:
+            return False
+        
+        # 消耗所有激活怪物的倒计时回合
+        self._consume_all_active_monsters_countdown()
+        
+        # 发新卡牌
+        self._deal_cards()
+        
+        # 回合数+1
+        self.current_turn += 1
+        
+        return True
+    
+    def _deal_cards(self):
+        """发牌（每回合发3张随机卡牌）"""
+        # 如果手牌已满，不再发牌
+        if len(self.hand) >= MAX_HAND_SIZE:
+            return
+        
+        # 计算需要发的牌数
+        cards_to_deal = min(CARDS_PER_TURN, MAX_HAND_SIZE - len(self.hand))
+        
+        # 发牌
+        for _ in range(cards_to_deal):
+            # 随机生成1-8的兵种类型
+            unit_type = random.randint(1, 8)
+            card = Card(unit_type)
+            self.hand.append(card)
     
     def update(self):
         """
@@ -374,6 +441,8 @@ class Game:
         """获取游戏状态文本"""
         state = []
         state.append(f"生命值: {self.health}")
+        state.append(f"回合数: {self.current_turn}")
+        state.append(f"手牌数: {len(self.hand)}")
         active_monsters = self.get_active_monsters()
         state.append(f"激活怪物: {len(active_monsters)}")
         # 剩余怪物 = 所有未结算的怪物（battle_won为None）

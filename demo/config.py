@@ -30,10 +30,25 @@ COLOR_BACKGROUND = (240, 240, 240)  # 背景色 - 浅灰色
 COLOR_UI_BG = (50, 50, 50)  # UI背景 - 深灰色
 COLOR_UI_TEXT = (255, 255, 255)  # UI文字 - 白色
 
+# 卡牌配置
+CARD_WIDTH = 80  # 卡牌宽度
+CARD_HEIGHT = 120  # 卡牌高度
+CARD_MARGIN = 5  # 卡牌间距
+CARDS_PER_TURN = 3  # 每回合发牌数量
+MAX_HAND_SIZE = 10  # 手牌最大数量
+HAND_AREA_Y = MAP_HEIGHT * (CELL_SIZE + CELL_MARGIN) + CELL_MARGIN + 20  # 手牌区域Y坐标
+
 # 窗口配置
 WINDOW_WIDTH = MAP_WIDTH * (CELL_SIZE + CELL_MARGIN) + CELL_MARGIN + 200  # 地图宽度 + UI区域
-WINDOW_HEIGHT = MAP_HEIGHT * (CELL_SIZE + CELL_MARGIN) + CELL_MARGIN + 100  # 地图高度 + 底部信息
+WINDOW_HEIGHT = MAP_HEIGHT * (CELL_SIZE + CELL_MARGIN) + CELL_MARGIN + HAND_AREA_Y + CARD_HEIGHT + 40  # 地图高度 + 手牌区域 + 底部信息
 UI_PANEL_WIDTH = 200  # UI面板宽度
+
+# 按钮配置
+BUTTON_HEIGHT = 40  # 按钮高度
+BUTTON_WIDTH = 120  # 按钮宽度
+BUTTON_COLOR = (100, 150, 200)  # 按钮颜色
+BUTTON_HOVER_COLOR = (120, 170, 220)  # 按钮悬停颜色
+BUTTON_TEXT_COLOR = (255, 255, 255)  # 按钮文字颜色
 
 # 兵种职业名称
 UNIT_NAMES = {

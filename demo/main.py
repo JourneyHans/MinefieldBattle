@@ -8,6 +8,7 @@ import random
 from config import *
 from game import Game
 from cell import MonsterCell, NumberCell, CellState
+from card import Card
 
 
 def get_chinese_font(size):
@@ -139,12 +140,107 @@ def draw_cell(screen, cell, x, y, game=None):
                 screen.blit(text_surface, text_rect)
 
 
+def draw_card(screen, card, x, y, selected=False):
+    """绘制一张卡牌"""
+    # 卡牌背景
+    card_rect = pygame.Rect(x, y, CARD_WIDTH, CARD_HEIGHT)
+    if selected:
+        # 选中的卡牌用更亮的颜色
+        color = (200, 200, 255)
+    else:
+        color = (180, 180, 220)
+    pygame.draw.rect(screen, color, card_rect)
+    pygame.draw.rect(screen, COLOR_TEXT, card_rect, 2)  # 边框
+    
+    # 绘制卡牌内容
+    font = get_chinese_font(18)
+    # 兵种名称
+    name_text = font.render(card.name, True, COLOR_TEXT)
+    name_rect = name_text.get_rect()
+    name_rect.centerx = x + CARD_WIDTH // 2
+    name_rect.centery = y + 30
+    screen.blit(name_text, name_rect)
+    
+    # 战力值
+    power_font = get_chinese_font(24)
+    power_text = power_font.render(f"战力: {card.power}", True, COLOR_TEXT)
+    power_rect = power_text.get_rect()
+    power_rect.centerx = x + CARD_WIDTH // 2
+    power_rect.centery = y + CARD_HEIGHT - 30
+    screen.blit(power_text, power_rect)
+    
+    # 兵种类型（数字）
+    type_font = get_chinese_font(32)
+    type_text = type_font.render(str(card.unit_type), True, COLOR_TEXT)
+    type_rect = type_text.get_rect()
+    type_rect.centerx = x + CARD_WIDTH // 2
+    type_rect.centery = y + CARD_HEIGHT // 2
+    screen.blit(type_text, type_rect)
+
+
+def draw_hand(screen, game, dragging_card=None):
+    """绘制手牌"""
+    hand_y = HAND_AREA_Y
+    hand_x_start = CELL_MARGIN
+    
+    # 绘制手牌区域背景
+    hand_area_rect = pygame.Rect(0, hand_y - 10, MAP_WIDTH * (CELL_SIZE + CELL_MARGIN) + CELL_MARGIN, CARD_HEIGHT + 20)
+    pygame.draw.rect(screen, (220, 220, 220), hand_area_rect)
+    pygame.draw.rect(screen, COLOR_TEXT, hand_area_rect, 2)
+    
+    # 绘制每张卡牌
+    for i, card in enumerate(game.hand):
+        if card == dragging_card:
+            continue  # 拖拽中的卡牌不在这里绘制
+        
+        card_x = hand_x_start + i * (CARD_WIDTH + CARD_MARGIN)
+        draw_card(screen, card, card_x, hand_y)
+
+
+def draw_end_turn_button(screen, mouse_pos):
+    """绘制结束回合按钮"""
+    button_x = MAP_WIDTH * (CELL_SIZE + CELL_MARGIN) + CELL_MARGIN + 20
+    button_y = HAND_AREA_Y + 10
+    
+    button_rect = pygame.Rect(button_x, button_y, BUTTON_WIDTH, BUTTON_HEIGHT)
+    
+    # 检查鼠标是否悬停
+    is_hover = button_rect.collidepoint(mouse_pos)
+    button_color = BUTTON_HOVER_COLOR if is_hover else BUTTON_COLOR
+    
+    # 绘制按钮
+    pygame.draw.rect(screen, button_color, button_rect)
+    pygame.draw.rect(screen, COLOR_TEXT, button_rect, 2)
+    
+    # 绘制按钮文字
+    font = get_chinese_font(24)
+    text = font.render("结束回合", True, BUTTON_TEXT_COLOR)
+    text_rect = text.get_rect()
+    text_rect.center = button_rect.center
+    screen.blit(text, text_rect)
+    
+    return button_rect
+
+
+def get_card_at_position(game, x, y):
+    """获取指定位置的手牌卡牌"""
+    hand_y = HAND_AREA_Y
+    hand_x_start = CELL_MARGIN
+    
+    for i, card in enumerate(game.hand):
+        card_x = hand_x_start + i * (CARD_WIDTH + CARD_MARGIN)
+        card_rect = pygame.Rect(card_x, hand_y, CARD_WIDTH, CARD_HEIGHT)
+        if card_rect.collidepoint(x, y):
+            return card, i
+    return None, -1
+
+
 def draw_ui(screen, game):
     """绘制UI信息"""
     ui_x = MAP_WIDTH * (CELL_SIZE + CELL_MARGIN) + CELL_MARGIN + 20
     
     # 绘制UI背景
-    ui_rect = pygame.Rect(ui_x - 10, 10, UI_PANEL_WIDTH, WINDOW_HEIGHT - 20)
+    ui_rect = pygame.Rect(ui_x - 10, 10, UI_PANEL_WIDTH, HAND_AREA_Y - 20)
     pygame.draw.rect(screen, COLOR_UI_BG, ui_rect)
     
     # 绘制游戏状态
@@ -162,7 +258,7 @@ def draw_ui(screen, game):
             color = (255, 150, 150)  # 浅红色
         elif "玩家战力" in text:
             color = (150, 255, 150)  # 浅绿色
-        elif "倒计时回合" in text:
+        elif "倒计时回合" in text or "回合数" in text:
             color = (255, 200, 100)  # 橙色
         else:
             color = COLOR_UI_TEXT  # 默认白色
@@ -173,27 +269,28 @@ def draw_ui(screen, game):
     
     # 绘制操作说明
     y_offset += 20
-    font_small = get_chinese_font(20)
+    font_small = get_chinese_font(18)
     instructions = [
         "操作说明:",
         "左键点击:",
         "  - 揭示格子",
+        "",
+        "拖拽卡牌:",
+        "  - 拖到数字格子",
         "  - 部署兵种",
         "",
         "规则:",
         "- 数字=兵种类型",
-        "- 点击数字格子",
-        "  可部署兵种",
-        "- 触发怪物后",
-        "  开始倒计时",
-        "- 倒计时结束",
-        "  自动战斗结算"
+        "- 卡牌类型需",
+        "  匹配格子数字",
+        "- 点击结束回合",
+        "  消耗怪物倒计时"
     ]
     
     for instruction in instructions:
         text_surface = font_small.render(instruction, True, COLOR_UI_TEXT)
         screen.blit(text_surface, (ui_x, y_offset))
-        y_offset += 22
+        y_offset += 20
 
 
 def main():
@@ -208,34 +305,78 @@ def main():
     monster_count = random.randint(MONSTER_COUNT_MIN, MONSTER_COUNT_MAX)
     game = Game(MAP_WIDTH, MAP_HEIGHT, monster_count)
     
+    # 拖拽状态
+    dragging_card = None  # 当前拖拽的卡牌
+    drag_offset_x = 0  # 拖拽偏移量
+    drag_offset_y = 0
+    
     running = True
     
     while running:
+        mouse_pos = pygame.mouse.get_pos()
+        
         # 处理事件
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:  # 左键点击
-                    # 计算点击的格子位置
+                if event.button == 1:  # 左键按下
                     mouse_x, mouse_y = event.pos
+                    
+                    # 检查是否点击在结束回合按钮上
+                    button_rect = pygame.Rect(
+                        MAP_WIDTH * (CELL_SIZE + CELL_MARGIN) + CELL_MARGIN + 20,
+                        HAND_AREA_Y + 10,
+                        BUTTON_WIDTH,
+                        BUTTON_HEIGHT
+                    )
+                    if button_rect.collidepoint(mouse_x, mouse_y):
+                        game.end_turn()
+                        continue
+                    
+                    # 检查是否点击在手牌上
+                    card, card_index = get_card_at_position(game, mouse_x, mouse_y)
+                    if card:
+                        # 开始拖拽
+                        dragging_card = card
+                        # 计算拖拽偏移量（鼠标相对于卡牌的位置）
+                        hand_y = HAND_AREA_Y
+                        hand_x_start = CELL_MARGIN
+                        card_x = hand_x_start + card_index * (CARD_WIDTH + CARD_MARGIN)
+                        drag_offset_x = mouse_x - (card_x + CARD_WIDTH // 2)
+                        drag_offset_y = mouse_y - (hand_y + CARD_HEIGHT // 2)
+                    else:
+                        # 检查是否点击在地图区域内（揭示格子）
+                        col = (mouse_x - CELL_MARGIN) // (CELL_SIZE + CELL_MARGIN)
+                        row = (mouse_y - CELL_MARGIN) // (CELL_SIZE + CELL_MARGIN)
+                        
+                        if 0 <= row < MAP_HEIGHT and 0 <= col < MAP_WIDTH:
+                            game.click_cell(row, col)
+            elif event.type == pygame.MOUSEBUTTONUP:
+                if event.button == 1 and dragging_card:  # 左键释放
+                    mouse_x, mouse_y = event.pos
+                    
+                    # 计算释放位置的格子坐标
                     col = (mouse_x - CELL_MARGIN) // (CELL_SIZE + CELL_MARGIN)
                     row = (mouse_y - CELL_MARGIN) // (CELL_SIZE + CELL_MARGIN)
                     
-                    # 检查是否点击在地图区域内
+                    # 尝试部署卡牌
                     if 0 <= row < MAP_HEIGHT and 0 <= col < MAP_WIDTH:
-                        game.click_cell(row, col)
+                        game.deploy_card(dragging_card, row, col)
+                    
+                    # 结束拖拽
+                    dragging_card = None
             elif event.type == pygame.KEYDOWN:
                 # 按R或r重新开始游戏
-                # 检查按键码或unicode字符
                 if event.key == pygame.K_r:
                     monster_count = random.randint(MONSTER_COUNT_MIN, MONSTER_COUNT_MAX)
                     game = Game(MAP_WIDTH, MAP_HEIGHT, monster_count)
+                    dragging_card = None
                 elif hasattr(event, 'unicode') and event.unicode:
-                    # 检查unicode字符（支持大小写）
                     if event.unicode.lower() == 'r':
                         monster_count = random.randint(MONSTER_COUNT_MIN, MONSTER_COUNT_MAX)
                         game = Game(MAP_WIDTH, MAP_HEIGHT, monster_count)
+                        dragging_card = None
         
         # 更新游戏状态
         game.update()
@@ -250,7 +391,35 @@ def main():
                 if cell:
                     x = CELL_MARGIN + col * (CELL_SIZE + CELL_MARGIN)
                     y = CELL_MARGIN + row * (CELL_SIZE + CELL_MARGIN)
+                    
+                    # 如果正在拖拽卡牌，检查是否可以部署到这个格子
+                    highlight = False
+                    if dragging_card:
+                        if (cell.is_revealed() and isinstance(cell, NumberCell) and 
+                            cell.number == dragging_card.unit_type and not cell.has_unit()):
+                            highlight = True
+                    
                     draw_cell(screen, cell, x, y, game)
+                    
+                    # 高亮显示可以部署的格子
+                    if highlight:
+                        highlight_rect = pygame.Rect(x, y, CELL_SIZE, CELL_SIZE)
+                        highlight_surface = pygame.Surface((CELL_SIZE, CELL_SIZE), pygame.SRCALPHA)
+                        highlight_surface.fill((100, 255, 100, 100))  # 半透明绿色
+                        screen.blit(highlight_surface, highlight_rect)
+        
+        # 绘制手牌
+        draw_hand(screen, game, dragging_card)
+        
+        # 绘制拖拽中的卡牌
+        if dragging_card:
+            mouse_x, mouse_y = pygame.mouse.get_pos()
+            card_x = mouse_x - drag_offset_x - CARD_WIDTH // 2
+            card_y = mouse_y - drag_offset_y - CARD_HEIGHT // 2
+            draw_card(screen, dragging_card, card_x, card_y, selected=True)
+        
+        # 绘制结束回合按钮
+        draw_end_turn_button(screen, mouse_pos)
         
         # 绘制UI
         draw_ui(screen, game)
