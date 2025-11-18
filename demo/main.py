@@ -65,12 +65,15 @@ def draw_cell(screen, cell, x, y, game=None):
     if isinstance(cell, MonsterCell) and cell.is_countdown_active():
         countdown = cell.get_countdown_remaining()
         if countdown > 0:
-            # 在格子上方绘制倒计时数字
-            countdown_font = get_chinese_font(20)
+            # 在格子上方绘制倒计时数字（字体大小根据格子大小动态调整）
+            # 原始比例：CELL_SIZE=50时，font=20
+            countdown_font_size = max(10, int(20 * (CELL_SIZE / 50.0)))
+            countdown_font = get_chinese_font(countdown_font_size)
             countdown_text = countdown_font.render(str(countdown), True, (255, 255, 0))  # 黄色
             countdown_rect = countdown_text.get_rect()
             countdown_rect.centerx = x + CELL_SIZE // 2
-            countdown_rect.centery = y - 12  # 在格子上方12像素
+            countdown_offset = max(8, int(12 * (CELL_SIZE / 50.0)))
+            countdown_rect.centery = y - countdown_offset  # 在格子上方
             # 绘制半透明背景（圆形或圆角矩形）
             bg_radius = max(countdown_rect.width, countdown_rect.height) // 2 + 4
             bg_rect = pygame.Rect(countdown_rect.centerx - bg_radius, 
@@ -152,25 +155,31 @@ def draw_card(screen, card, x, y, selected=False):
     pygame.draw.rect(screen, color, card_rect)
     pygame.draw.rect(screen, COLOR_TEXT, card_rect, 2)  # 边框
     
-    # 绘制卡牌内容
-    font = get_chinese_font(18)
+    # 绘制卡牌内容（字体大小根据卡牌大小动态调整）
+    # 原始比例：CARD_WIDTH=80时，name_font=18, power_font=24, type_font=32
+    card_scale = CARD_WIDTH / 80.0
+    name_font_size = max(10, int(18 * card_scale))
+    power_font_size = max(12, int(24 * card_scale))
+    type_font_size = max(16, int(32 * card_scale))
+    
     # 兵种名称
-    name_text = font.render(card.name, True, COLOR_TEXT)
+    name_font = get_chinese_font(name_font_size)
+    name_text = name_font.render(card.name, True, COLOR_TEXT)
     name_rect = name_text.get_rect()
     name_rect.centerx = x + CARD_WIDTH // 2
-    name_rect.centery = y + 30
+    name_rect.centery = y + int(CARD_HEIGHT * 0.25)
     screen.blit(name_text, name_rect)
     
     # 战力值
-    power_font = get_chinese_font(24)
+    power_font = get_chinese_font(power_font_size)
     power_text = power_font.render(f"战力: {card.power}", True, COLOR_TEXT)
     power_rect = power_text.get_rect()
     power_rect.centerx = x + CARD_WIDTH // 2
-    power_rect.centery = y + CARD_HEIGHT - 30
+    power_rect.centery = y + CARD_HEIGHT - int(CARD_HEIGHT * 0.25)
     screen.blit(power_text, power_rect)
     
     # 兵种类型（数字）
-    type_font = get_chinese_font(32)
+    type_font = get_chinese_font(type_font_size)
     type_text = type_font.render(str(card.unit_type), True, COLOR_TEXT)
     type_rect = type_text.get_rect()
     type_rect.centerx = x + CARD_WIDTH // 2
@@ -183,8 +192,9 @@ def draw_hand(screen, game, dragging_card=None):
     hand_y = HAND_AREA_Y
     hand_x_start = HAND_AREA_X
     
-    # 绘制手牌区域背景
-    hand_area_rect = pygame.Rect(HAND_AREA_X, hand_y - 10, HAND_AREA_WIDTH, CARD_HEIGHT + 20)
+    # 绘制手牌区域背景（高度根据卡牌大小动态调整）
+    hand_area_padding = max(5, int(10 * (CARD_HEIGHT / 120.0)))
+    hand_area_rect = pygame.Rect(HAND_AREA_X, hand_y - hand_area_padding, HAND_AREA_WIDTH, CARD_HEIGHT + hand_area_padding * 2)
     pygame.draw.rect(screen, (220, 220, 220), hand_area_rect)
     pygame.draw.rect(screen, COLOR_TEXT, hand_area_rect, 2)
     
@@ -212,8 +222,11 @@ def draw_end_turn_button(screen, mouse_pos):
     pygame.draw.rect(screen, button_color, button_rect)
     pygame.draw.rect(screen, COLOR_TEXT, button_rect, 2)
     
-    # 绘制按钮文字
-    font = get_chinese_font(24)
+    # 绘制按钮文字（字体大小根据按钮大小动态调整）
+    # 原始比例：BUTTON_WIDTH=120时，font=24
+    button_scale = BUTTON_WIDTH / 120.0
+    font_size = max(12, int(24 * button_scale))
+    font = get_chinese_font(font_size)
     text = font.render("结束回合", True, BUTTON_TEXT_COLOR)
     text_rect = text.get_rect()
     text_rect.center = button_rect.center
@@ -243,11 +256,18 @@ def draw_ui(screen, game):
     ui_rect = pygame.Rect(UI_PANEL_X, UI_PANEL_Y, UI_PANEL_WIDTH, UI_PANEL_HEIGHT)
     pygame.draw.rect(screen, COLOR_UI_BG, ui_rect)
     
-    # 绘制游戏状态
-    font = get_chinese_font(28)
+    # 绘制游戏状态（字体大小根据UI面板大小动态调整）
+    # 原始比例：UI_PANEL_WIDTH=300时，font=28, font_small=18
+    ui_scale = UI_PANEL_WIDTH / 300.0
+    font_size = max(14, int(28 * ui_scale))
+    font_small_size = max(10, int(18 * ui_scale))
+    line_spacing = max(20, int(32 * ui_scale))
+    section_spacing = max(10, int(20 * ui_scale))
+    
+    font = get_chinese_font(font_size)
     state_texts = game.get_game_state_text()
     
-    y_offset = UI_PANEL_Y + 30
+    y_offset = UI_PANEL_Y + max(15, int(30 * ui_scale))
     for text in state_texts:
         # 根据文本内容选择颜色
         if "战力优势" in text or "游戏胜利" in text:
@@ -265,11 +285,11 @@ def draw_ui(screen, game):
         
         text_surface = font.render(text, True, color)
         screen.blit(text_surface, (ui_x, y_offset))
-        y_offset += 32
+        y_offset += line_spacing
     
     # 绘制操作说明
-    y_offset += 20
-    font_small = get_chinese_font(18)
+    y_offset += section_spacing
+    font_small = get_chinese_font(font_small_size)
     instructions = [
         "操作说明:",
         "左键点击:",
@@ -287,15 +307,20 @@ def draw_ui(screen, game):
         "  消耗怪物倒计时"
     ]
     
+    small_line_spacing = max(12, int(20 * ui_scale))
     for instruction in instructions:
         text_surface = font_small.render(instruction, True, COLOR_UI_TEXT)
         screen.blit(text_surface, (ui_x, y_offset))
-        y_offset += 20
+        y_offset += small_line_spacing
 
 
 def main():
     """主函数"""
     pygame.init()
+    
+    # 确保布局根据当前窗口大小计算（如果窗口大小被修改）
+    from config import calculate_layout
+    calculate_layout()
     
     screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
     pygame.display.set_caption("魔法军团：地雷战场")
@@ -424,9 +449,14 @@ def main():
         # 绘制UI
         draw_ui(screen, game)
         
-        # 绘制游戏结束信息
+        # 绘制游戏结束信息（字体大小根据窗口大小动态调整）
         if game.game_over:
-            font_large = get_chinese_font(48)
+            # 原始比例：WINDOW_WIDTH=1920时，font_large=48, font_small=24
+            window_scale = min(WINDOW_WIDTH / 1920.0, WINDOW_HEIGHT / 1080.0)
+            font_large_size = max(24, int(48 * window_scale))
+            font_small_size = max(12, int(24 * window_scale))
+            
+            font_large = get_chinese_font(font_large_size)
             if game.game_won:
                 text = "游戏胜利！"
                 color = (100, 255, 100)
@@ -447,11 +477,12 @@ def main():
             screen.blit(text_surface, text_rect)
             
             # 提示按R重新开始
-            font_small = get_chinese_font(24)
+            font_small = get_chinese_font(font_small_size)
             restart_text = font_small.render("按 R 键重新开始", True, COLOR_UI_TEXT)
             restart_rect = restart_text.get_rect()
             restart_rect.centerx = WINDOW_WIDTH // 2
-            restart_rect.centery = WINDOW_HEIGHT // 2 + 50
+            restart_offset = max(25, int(50 * window_scale))
+            restart_rect.centery = WINDOW_HEIGHT // 2 + restart_offset
             screen.blit(restart_text, restart_rect)
         
         pygame.display.flip()
