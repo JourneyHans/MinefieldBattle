@@ -36,12 +36,29 @@ CARD_HEIGHT = 120  # 卡牌高度
 CARD_MARGIN = 5  # 卡牌间距
 CARDS_PER_TURN = 3  # 每回合发牌数量
 MAX_HAND_SIZE = 10  # 手牌最大数量
-HAND_AREA_Y = MAP_HEIGHT * (CELL_SIZE + CELL_MARGIN) + CELL_MARGIN + 20  # 手牌区域Y坐标
 
-# 窗口配置
-WINDOW_WIDTH = MAP_WIDTH * (CELL_SIZE + CELL_MARGIN) + CELL_MARGIN + 200  # 地图宽度 + UI区域
-WINDOW_HEIGHT = MAP_HEIGHT * (CELL_SIZE + CELL_MARGIN) + CELL_MARGIN + HAND_AREA_Y + CARD_HEIGHT + 40  # 地图高度 + 手牌区域 + 底部信息
-UI_PANEL_WIDTH = 200  # UI面板宽度
+# 窗口配置 - 固定16:9分辨率
+WINDOW_WIDTH = 1920  # 窗口宽度
+WINDOW_HEIGHT = 1080  # 窗口高度
+
+# 布局配置
+MAP_AREA_WIDTH = MAP_WIDTH * (CELL_SIZE + CELL_MARGIN) + CELL_MARGIN  # 地图区域宽度
+MAP_AREA_HEIGHT = MAP_HEIGHT * (CELL_SIZE + CELL_MARGIN) + CELL_MARGIN  # 地图区域高度
+MAP_START_X = 50  # 地图起始X坐标（左侧边距）
+MAP_START_Y = 50  # 地图起始Y坐标（顶部边距）
+
+UI_PANEL_WIDTH = 300  # UI面板宽度
+UI_PANEL_X = MAP_START_X + MAP_AREA_WIDTH + 30  # UI面板X坐标（地图右侧）
+UI_PANEL_Y = MAP_START_Y  # UI面板Y坐标（与地图顶部对齐）
+# UI面板高度：从地图顶部到窗口底部，留出底部边距
+UI_PANEL_HEIGHT = WINDOW_HEIGHT - MAP_START_Y - 20  # UI面板高度（充分利用垂直空间）
+
+HAND_AREA_Y = MAP_START_Y + MAP_AREA_HEIGHT + 30  # 手牌区域Y坐标（地图下方）
+HAND_AREA_X = MAP_START_X  # 手牌区域X坐标（与地图左侧对齐）
+HAND_AREA_WIDTH = MAP_AREA_WIDTH  # 手牌区域宽度（与地图宽度一致）
+
+BUTTON_X = HAND_AREA_X + HAND_AREA_WIDTH + 30  # 结束回合按钮X坐标
+BUTTON_Y = HAND_AREA_Y + 10  # 结束回合按钮Y坐标
 
 # 按钮配置
 BUTTON_HEIGHT = 40  # 按钮高度

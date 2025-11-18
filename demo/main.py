@@ -181,10 +181,10 @@ def draw_card(screen, card, x, y, selected=False):
 def draw_hand(screen, game, dragging_card=None):
     """绘制手牌"""
     hand_y = HAND_AREA_Y
-    hand_x_start = CELL_MARGIN
+    hand_x_start = HAND_AREA_X
     
     # 绘制手牌区域背景
-    hand_area_rect = pygame.Rect(0, hand_y - 10, MAP_WIDTH * (CELL_SIZE + CELL_MARGIN) + CELL_MARGIN, CARD_HEIGHT + 20)
+    hand_area_rect = pygame.Rect(HAND_AREA_X, hand_y - 10, HAND_AREA_WIDTH, CARD_HEIGHT + 20)
     pygame.draw.rect(screen, (220, 220, 220), hand_area_rect)
     pygame.draw.rect(screen, COLOR_TEXT, hand_area_rect, 2)
     
@@ -199,8 +199,8 @@ def draw_hand(screen, game, dragging_card=None):
 
 def draw_end_turn_button(screen, mouse_pos):
     """绘制结束回合按钮"""
-    button_x = MAP_WIDTH * (CELL_SIZE + CELL_MARGIN) + CELL_MARGIN + 20
-    button_y = HAND_AREA_Y + 10
+    button_x = BUTTON_X
+    button_y = BUTTON_Y
     
     button_rect = pygame.Rect(button_x, button_y, BUTTON_WIDTH, BUTTON_HEIGHT)
     
@@ -225,7 +225,7 @@ def draw_end_turn_button(screen, mouse_pos):
 def get_card_at_position(game, x, y):
     """获取指定位置的手牌卡牌"""
     hand_y = HAND_AREA_Y
-    hand_x_start = CELL_MARGIN
+    hand_x_start = HAND_AREA_X
     
     for i, card in enumerate(game.hand):
         card_x = hand_x_start + i * (CARD_WIDTH + CARD_MARGIN)
@@ -237,17 +237,17 @@ def get_card_at_position(game, x, y):
 
 def draw_ui(screen, game):
     """绘制UI信息"""
-    ui_x = MAP_WIDTH * (CELL_SIZE + CELL_MARGIN) + CELL_MARGIN + 20
+    ui_x = UI_PANEL_X
     
     # 绘制UI背景
-    ui_rect = pygame.Rect(ui_x - 10, 10, UI_PANEL_WIDTH, HAND_AREA_Y - 20)
+    ui_rect = pygame.Rect(UI_PANEL_X, UI_PANEL_Y, UI_PANEL_WIDTH, UI_PANEL_HEIGHT)
     pygame.draw.rect(screen, COLOR_UI_BG, ui_rect)
     
     # 绘制游戏状态
     font = get_chinese_font(28)
     state_texts = game.get_game_state_text()
     
-    y_offset = 30
+    y_offset = UI_PANEL_Y + 30
     for text in state_texts:
         # 根据文本内容选择颜色
         if "战力优势" in text or "游戏胜利" in text:
@@ -325,8 +325,8 @@ def main():
                     
                     # 检查是否点击在结束回合按钮上
                     button_rect = pygame.Rect(
-                        MAP_WIDTH * (CELL_SIZE + CELL_MARGIN) + CELL_MARGIN + 20,
-                        HAND_AREA_Y + 10,
+                        BUTTON_X,
+                        BUTTON_Y,
                         BUTTON_WIDTH,
                         BUTTON_HEIGHT
                     )
@@ -341,14 +341,14 @@ def main():
                         dragging_card = card
                         # 计算拖拽偏移量（鼠标相对于卡牌的位置）
                         hand_y = HAND_AREA_Y
-                        hand_x_start = CELL_MARGIN
+                        hand_x_start = HAND_AREA_X
                         card_x = hand_x_start + card_index * (CARD_WIDTH + CARD_MARGIN)
                         drag_offset_x = mouse_x - (card_x + CARD_WIDTH // 2)
                         drag_offset_y = mouse_y - (hand_y + CARD_HEIGHT // 2)
                     else:
                         # 检查是否点击在地图区域内（揭示格子）
-                        col = (mouse_x - CELL_MARGIN) // (CELL_SIZE + CELL_MARGIN)
-                        row = (mouse_y - CELL_MARGIN) // (CELL_SIZE + CELL_MARGIN)
+                        col = (mouse_x - MAP_START_X - CELL_MARGIN) // (CELL_SIZE + CELL_MARGIN)
+                        row = (mouse_y - MAP_START_Y - CELL_MARGIN) // (CELL_SIZE + CELL_MARGIN)
                         
                         if 0 <= row < MAP_HEIGHT and 0 <= col < MAP_WIDTH:
                             game.click_cell(row, col)
@@ -357,8 +357,8 @@ def main():
                     mouse_x, mouse_y = event.pos
                     
                     # 计算释放位置的格子坐标
-                    col = (mouse_x - CELL_MARGIN) // (CELL_SIZE + CELL_MARGIN)
-                    row = (mouse_y - CELL_MARGIN) // (CELL_SIZE + CELL_MARGIN)
+                    col = (mouse_x - MAP_START_X - CELL_MARGIN) // (CELL_SIZE + CELL_MARGIN)
+                    row = (mouse_y - MAP_START_Y - CELL_MARGIN) // (CELL_SIZE + CELL_MARGIN)
                     
                     # 尝试部署卡牌
                     if 0 <= row < MAP_HEIGHT and 0 <= col < MAP_WIDTH:
@@ -389,8 +389,8 @@ def main():
             for col in range(MAP_WIDTH):
                 cell = game.get_cell(row, col)
                 if cell:
-                    x = CELL_MARGIN + col * (CELL_SIZE + CELL_MARGIN)
-                    y = CELL_MARGIN + row * (CELL_SIZE + CELL_MARGIN)
+                    x = MAP_START_X + CELL_MARGIN + col * (CELL_SIZE + CELL_MARGIN)
+                    y = MAP_START_Y + CELL_MARGIN + row * (CELL_SIZE + CELL_MARGIN)
                     
                     # 如果正在拖拽卡牌，检查是否可以部署到这个格子
                     highlight = False
