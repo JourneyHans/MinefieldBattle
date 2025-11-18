@@ -38,8 +38,8 @@ CARDS_PER_TURN = 3  # 每回合发牌数量
 MAX_HAND_SIZE = 10  # 手牌最大数量
 
 # 窗口配置 - 固定16:9分辨率
-WINDOW_WIDTH = 1920  # 窗口宽度
-WINDOW_HEIGHT = 1080  # 窗口高度
+WINDOW_WIDTH = 640  # 窗口宽度
+WINDOW_HEIGHT = 360  # 窗口高度
 
 # 布局配置
 MAP_AREA_WIDTH = MAP_WIDTH * (CELL_SIZE + CELL_MARGIN) + CELL_MARGIN  # 地图区域宽度
