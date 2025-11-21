@@ -109,13 +109,13 @@ class MonsterCell(Cell):
             return ""
         else:
             if self.monster_power > 0:
-                return f"怪物\n战力:{self.monster_power:.1f}"
+                return f"怪物\n战力:{int(self.monster_power)}"
             else:
                 return "怪物"
     
     def set_monster_power(self, power):
-        """设置怪物战力"""
-        self.monster_power = power
+        """设置怪物战力（向下取整）"""
+        self.monster_power = int(power)
     
     def set_battle_result(self, player_won):
         """设置战斗结果"""

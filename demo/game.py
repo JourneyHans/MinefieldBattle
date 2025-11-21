@@ -244,9 +244,9 @@ class Game:
             # 如果是怪物格子，触发战斗
             if isinstance(cell, MonsterCell):
                 cell.trigger()
-                # 计算怪物战力：基础战力 + (相邻数字和 / 除数)
+                # 计算怪物战力：基础战力 + (相邻数字和 / 除数)，向下取整
                 adjacent_numbers = self._get_adjacent_numbers(row, col)
-                monster_power = MONSTER_BASE_POWER + (sum(adjacent_numbers) / MONSTER_POWER_DIVISOR)
+                monster_power = int(MONSTER_BASE_POWER + (sum(adjacent_numbers) / MONSTER_POWER_DIVISOR))
                 cell.set_monster_power(monster_power)
             else:
                 # 数字格子，实现空白区域自动展开（只有数字为0时才展开）
@@ -412,13 +412,14 @@ class Game:
         战斗结算
         :param monster_cell: 怪物格子
         """
-        # 计算玩家战力（相邻8格已部署兵种总战力）
+        # 计算玩家战力（相邻8格已部署兵种总战力），向下取整
         player_power = 0
         for cell in self._get_adjacent_cells(monster_cell.row, monster_cell.col):
             player_power += cell.get_power()
+        player_power = int(player_power)
         
-        # 获取怪物战力
-        monster_power = monster_cell.monster_power
+        # 获取怪物战力（已经是整数）
+        monster_power = int(monster_cell.monster_power)
         
         # 判断胜负
         if player_power >= monster_power:
@@ -471,11 +472,11 @@ class Game:
         return True
     
     def get_player_power_around_monster(self, monster_cell):
-        """获取怪物周围玩家的战力"""
+        """获取怪物周围玩家的战力（向下取整）"""
         player_power = 0
         for cell in self._get_adjacent_cells(monster_cell.row, monster_cell.col):
             player_power += cell.get_power()
-        return player_power
+        return int(player_power)
     
     def get_game_state_text(self):
         """获取游戏状态文本"""
@@ -497,13 +498,13 @@ class Game:
             for i, monster in enumerate(active_monsters[:3]):  # 最多显示3个
                 remaining = monster.get_countdown_remaining()
                 state.append(f"怪物{i+1} 回合: {remaining}")
-                monster_power = monster.monster_power
+                monster_power = int(monster.monster_power)
                 player_power = self.get_player_power_around_monster(monster)
-                power_diff = player_power - monster_power
+                power_diff = int(player_power - monster_power)
                 if power_diff >= 0:
-                    state.append(f"  优势: +{power_diff:.1f}")
+                    state.append(f"  优势: +{power_diff}")
                 else:
-                    state.append(f"  不足: {power_diff:.1f}")
+                    state.append(f"  不足: {power_diff}")
             if len(active_monsters) > 3:
                 state.append(f"...还有{len(active_monsters)-3}个")
         
