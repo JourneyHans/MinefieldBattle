@@ -5,7 +5,7 @@
 import pygame
 import sys
 import random
-from config import *
+from config_mgr import *
 from game import Game
 from cell import MonsterCell, NumberCell, CellState
 from card import Card
@@ -328,7 +328,7 @@ def main():
     pygame.init()
     
     # 确保布局根据当前窗口大小计算（如果窗口大小被修改）
-    from config import calculate_layout
+    from config_mgr import calculate_layout
     calculate_layout()
     
     screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))

@@ -1,20 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-游戏配置常量
+UI外观和布局配置（UI设计师）
 """
-
-# 地图配置
-MAP_WIDTH = 10
-MAP_HEIGHT = 10
-CELL_SIZE = 50  # 每个格子的像素大小
-CELL_MARGIN = 2  # 格子之间的间距
-
-# 游戏配置
-INITIAL_HEALTH = 3  # 初始生命值
-INITIAL_ROUNDS = 50  # 初始回合数
-COUNTDOWN_DURATION = 5  # 倒计时时长（秒）
-MONSTER_COUNT_MIN = 10  # 最少怪物数量
-MONSTER_COUNT_MAX = 15  # 最多怪物数量
+# 导入地图和窗口配置（用于布局计算）
+from .map_config import MAP_WIDTH, MAP_HEIGHT
+from .card_config import CARD_WIDTH as CARD_WIDTH_DEFAULT, CARD_HEIGHT as CARD_HEIGHT_DEFAULT, CARD_MARGIN as CARD_MARGIN_DEFAULT
 
 # 颜色配置
 COLOR_HIDDEN = (100, 100, 100)  # 隐藏格子 - 灰色
@@ -29,13 +19,6 @@ COLOR_TEXT = (0, 0, 0)  # 文字颜色 - 黑色
 COLOR_BACKGROUND = (240, 240, 240)  # 背景色 - 浅灰色
 COLOR_UI_BG = (50, 50, 50)  # UI背景 - 深灰色
 COLOR_UI_TEXT = (255, 255, 255)  # UI文字 - 白色
-
-# 卡牌配置
-CARD_WIDTH = 80  # 卡牌宽度
-CARD_HEIGHT = 120  # 卡牌高度
-CARD_MARGIN = 5  # 卡牌间距
-CARDS_PER_TURN = 3  # 每回合发牌数量
-MAX_HAND_SIZE = 10  # 手牌最大数量
 
 # 窗口配置 - 固定16:9分辨率
 WINDOW_WIDTH = 640  # 窗口宽度
@@ -71,6 +54,11 @@ RIGHT_PANEL_WIDTH = 0
 RIGHT_PANEL_X = 0
 RIGHT_PANEL_Y = 0
 RIGHT_PANEL_HEIGHT = 0
+
+# 按钮配置（BUTTON_WIDTH和BUTTON_HEIGHT在calculate_layout()中动态计算）
+BUTTON_COLOR = (100, 150, 200)  # 按钮颜色
+BUTTON_HOVER_COLOR = (120, 170, 220)  # 按钮悬停颜色
+BUTTON_TEXT_COLOR = (255, 255, 255)  # 按钮文字颜色
 
 
 def calculate_layout():
@@ -160,21 +148,4 @@ def calculate_layout():
 
 # 初始化布局
 calculate_layout()
-
-# 按钮配置（BUTTON_WIDTH和BUTTON_HEIGHT在calculate_layout()中动态计算）
-BUTTON_COLOR = (100, 150, 200)  # 按钮颜色
-BUTTON_HOVER_COLOR = (120, 170, 220)  # 按钮悬停颜色
-BUTTON_TEXT_COLOR = (255, 255, 255)  # 按钮文字颜色
-
-# 兵种职业名称
-UNIT_NAMES = {
-    1: "战士",
-    2: "弓箭手",
-    3: "法师",
-    4: "圣骑士",
-    5: "盗贼",
-    6: "德鲁伊",
-    7: "龙骑士",
-    8: "大法师"
-}
 

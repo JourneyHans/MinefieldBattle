@@ -2,7 +2,7 @@
 """
 卡牌类定义
 """
-from config import UNIT_NAMES
+from config_mgr import UNIT_NAMES
 
 
 class Card:

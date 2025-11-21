@@ -6,7 +6,7 @@ import random
 from cell import Cell, NumberCell, MonsterCell, CellState
 from unit import Unit
 from card import Card
-from config import CARDS_PER_TURN, MAX_HAND_SIZE
+from config_mgr import CARDS_PER_TURN, MAX_HAND_SIZE
 
 
 class Game:
