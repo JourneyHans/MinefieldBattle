@@ -3,6 +3,7 @@
 格子类定义
 """
 from enum import Enum
+from config_mgr import COUNTDOWN_ROUNDS
 
 
 class CellState(Enum):
@@ -86,7 +87,7 @@ class MonsterCell(Cell):
         """触发怪物，开始回合倒计时"""
         if not self.triggered:
             self.triggered = True
-            self.countdown_rounds = 3  # 初始3回合倒计时
+            self.countdown_rounds = COUNTDOWN_ROUNDS  # 从配置读取倒计时回合数
             self.state = CellState.REVEALED
     
     def is_countdown_active(self):

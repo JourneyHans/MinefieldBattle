@@ -6,7 +6,7 @@ import random
 from cell import Cell, NumberCell, MonsterCell, CellState
 from unit import Unit
 from card import Card
-from config_mgr import CARDS_PER_TURN, MAX_HAND_SIZE
+from config_mgr import CARDS_PER_TURN, MAX_HAND_SIZE, MONSTER_BASE_POWER, MONSTER_POWER_DIVISOR, INITIAL_HEALTH
 
 
 class Game:
@@ -23,7 +23,7 @@ class Game:
         self.height = height
         self.monster_count = monster_count
         self.grid = [[None for _ in range(width)] for _ in range(height)]
-        self.health = 3  # 初始生命值
+        self.health = INITIAL_HEALTH  # 从配置读取初始生命值
         self.game_over = False
         self.game_won = False
         self.monsters = []  # 所有怪物列表
@@ -244,9 +244,9 @@ class Game:
             # 如果是怪物格子，触发战斗
             if isinstance(cell, MonsterCell):
                 cell.trigger()
-                # 计算怪物战力
+                # 计算怪物战力：基础战力 + (相邻数字和 / 除数)
                 adjacent_numbers = self._get_adjacent_numbers(row, col)
-                monster_power = sum(adjacent_numbers) / 2
+                monster_power = MONSTER_BASE_POWER + (sum(adjacent_numbers) / MONSTER_POWER_DIVISOR)
                 cell.set_monster_power(monster_power)
             else:
                 # 数字格子，实现空白区域自动展开（只有数字为0时才展开）
@@ -359,13 +359,13 @@ class Game:
         """
         # 定义权重：低数值权重高，高数值权重低
         # 1-4: 每个权重 5 (总共20)
-        # 5-6: 每个权重 2 (总共4)
-        # 7-8: 每个权重 1 (总共2)
-        # 总权重: 26
+        # 5-6: 每个权重 3 (总共6)
+        # 7-8: 每个权重 2 (总共4)
+        # 总权重: 30
         weights = {
             1: 5, 2: 5, 3: 5, 4: 5,  # 低数值，高权重
-            5: 2, 6: 2,              # 中数值，中权重
-            7: 1, 8: 1               # 高数值，低权重
+            5: 3, 6: 3,              # 中数值，中权重（提升）
+            7: 2, 8: 2               # 高数值，低权重（提升）
         }
         
         # 构建加权列表
