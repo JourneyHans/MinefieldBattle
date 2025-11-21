@@ -13,8 +13,8 @@ CELL_MARGIN = 2  # 格子之间的间距
 INITIAL_HEALTH = 3  # 初始生命值
 INITIAL_ROUNDS = 50  # 初始回合数
 COUNTDOWN_DURATION = 5  # 倒计时时长（秒）
-MONSTER_COUNT_MIN = 5  # 最少怪物数量
-MONSTER_COUNT_MAX = 8  # 最多怪物数量
+MONSTER_COUNT_MIN = 10  # 最少怪物数量
+MONSTER_COUNT_MAX = 15  # 最多怪物数量
 
 # 颜色配置
 COLOR_HIDDEN = (100, 100, 100)  # 隐藏格子 - 灰色
@@ -63,12 +63,23 @@ BUTTON_HEIGHT = 40  # 默认值，会被动态计算覆盖
 CARD_WIDTH = 80  # 默认值，会被动态计算覆盖
 CARD_HEIGHT = 120  # 默认值，会被动态计算覆盖
 CARD_MARGIN = 5  # 默认值，会被动态计算覆盖
+LEFT_PANEL_WIDTH = 0
+LEFT_PANEL_X = 0
+LEFT_PANEL_Y = 0
+LEFT_PANEL_HEIGHT = 0
+RIGHT_PANEL_WIDTH = 0
+RIGHT_PANEL_X = 0
+RIGHT_PANEL_Y = 0
+RIGHT_PANEL_HEIGHT = 0
 
 
 def calculate_layout():
     """
     根据窗口大小动态计算所有布局参数
-    支持任意16:9分辨率
+    布局方案：
+    - 左边：操作说明（小面板，不显眼）
+    - 中间：棋盘（大）+ 手牌（大）- 占据视觉主要位置
+    - 右边：游戏状态（生命值、回合数等）+ 结束回合按钮
     """
     global CELL_SIZE, CELL_MARGIN, MAP_AREA_WIDTH, MAP_AREA_HEIGHT
     global MAP_START_X, MAP_START_Y
@@ -76,68 +87,75 @@ def calculate_layout():
     global HAND_AREA_Y, HAND_AREA_X, HAND_AREA_WIDTH
     global BUTTON_X, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT
     global CARD_WIDTH, CARD_HEIGHT, CARD_MARGIN
+    global LEFT_PANEL_WIDTH, LEFT_PANEL_X, LEFT_PANEL_Y, LEFT_PANEL_HEIGHT
+    global RIGHT_PANEL_WIDTH, RIGHT_PANEL_X, RIGHT_PANEL_Y, RIGHT_PANEL_HEIGHT
     
-    # 基础边距（按窗口大小比例缩放）
-    base_margin = max(5, min(WINDOW_WIDTH, WINDOW_HEIGHT) // 20)
-    margin = base_margin
+    # 基础边距
+    margin = max(5, min(WINDOW_WIDTH, WINDOW_HEIGHT) // 40)
     
-    # UI面板最小宽度（按窗口宽度比例）
-    ui_panel_min_width = max(150, WINDOW_WIDTH // 5)
-    ui_panel_max_width = WINDOW_WIDTH // 3
+    # 左边面板（操作说明）- 不显眼，较小
+    LEFT_PANEL_WIDTH = max(120, WINDOW_WIDTH // 8)
+    LEFT_PANEL_X = margin
+    LEFT_PANEL_Y = margin
+    LEFT_PANEL_HEIGHT = WINDOW_HEIGHT - margin * 2
     
-    # 手牌区域预留高度（按窗口高度比例）
-    hand_area_reserved_height = max(80, WINDOW_HEIGHT // 6)
+    # 右边面板（游戏状态）- 中等大小
+    RIGHT_PANEL_WIDTH = max(150, WINDOW_WIDTH // 6)
+    RIGHT_PANEL_X = WINDOW_WIDTH - RIGHT_PANEL_WIDTH - margin
+    RIGHT_PANEL_Y = margin
+    RIGHT_PANEL_HEIGHT = WINDOW_HEIGHT - margin * 2
     
-    # 计算地图可用空间
-    # 方案：地图在左，UI在右，手牌在底部
-    available_width_for_map = WINDOW_WIDTH - margin * 2 - ui_panel_min_width - margin
-    available_height_for_map = WINDOW_HEIGHT - margin * 2 - hand_area_reserved_height - margin
+    # 中间区域（棋盘和手牌）- 占据主要空间
+    center_area_x = LEFT_PANEL_X + LEFT_PANEL_WIDTH + margin
+    center_area_width = RIGHT_PANEL_X - center_area_x - margin
+    center_area_height = WINDOW_HEIGHT - margin * 2
     
-    # 计算格子大小（确保地图完整显示）
-    # 地图需要：MAP_WIDTH个格子 + (MAP_WIDTH-1)个间距 + 2个边距
-    cell_size_by_width = (available_width_for_map - margin * 2) // (MAP_WIDTH + 1)
-    cell_size_by_height = (available_height_for_map - margin * 2) // (MAP_HEIGHT + 1)
+    # 手牌区域预留高度（按窗口高度比例，但不要太大）
+    hand_area_reserved_height = max(60, center_area_height // 5)
+    
+    # 地图可用空间
+    available_width_for_map = center_area_width - margin * 2
+    available_height_for_map = center_area_height - hand_area_reserved_height - margin * 2
+    
+    # 计算格子大小（让棋盘尽可能大）
+    cell_size_by_width = (available_width_for_map - margin) // (MAP_WIDTH + 1)
+    cell_size_by_height = (available_height_for_map - margin) // (MAP_HEIGHT + 1)
     
     # 取较小值，确保地图完整显示
-    CELL_SIZE = max(15, min(cell_size_by_width, cell_size_by_height))  # 最小15像素
-    CELL_MARGIN = max(1, CELL_SIZE // 25)  # 间距按比例缩放
+    CELL_SIZE = max(20, min(cell_size_by_width, cell_size_by_height))
+    CELL_MARGIN = max(1, CELL_SIZE // 25)
     
     # 计算地图区域实际大小
     MAP_AREA_WIDTH = MAP_WIDTH * (CELL_SIZE + CELL_MARGIN) + CELL_MARGIN
     MAP_AREA_HEIGHT = MAP_HEIGHT * (CELL_SIZE + CELL_MARGIN) + CELL_MARGIN
     
-    # 地图起始位置（居中或靠左）
-    MAP_START_X = margin
-    MAP_START_Y = margin
+    # 地图在中间区域居中
+    MAP_START_X = center_area_x + (center_area_width - MAP_AREA_WIDTH) // 2
+    MAP_START_Y = margin + (available_height_for_map - MAP_AREA_HEIGHT) // 2
     
-    # UI面板位置和大小
-    UI_PANEL_X = MAP_START_X + MAP_AREA_WIDTH + margin
-    UI_PANEL_Y = MAP_START_Y
-    # UI面板宽度：使用剩余空间，但限制在合理范围内
-    remaining_width = WINDOW_WIDTH - UI_PANEL_X - margin
-    UI_PANEL_WIDTH = max(ui_panel_min_width, min(ui_panel_max_width, remaining_width))
-    # UI面板高度：从地图顶部到窗口底部（留出底部边距）
-    UI_PANEL_HEIGHT = WINDOW_HEIGHT - UI_PANEL_Y - margin
-    
-    # 手牌区域位置和大小
-    HAND_AREA_X = MAP_START_X
+    # 手牌区域位置和大小（在棋盘下方，居中）
+    HAND_AREA_X = center_area_x + (center_area_width - MAP_AREA_WIDTH) // 2
     HAND_AREA_Y = MAP_START_Y + MAP_AREA_HEIGHT + margin
     HAND_AREA_WIDTH = MAP_AREA_WIDTH
     
-    # 卡牌大小（根据格子大小按比例计算）
-    # 原始比例：CELL_SIZE=50时，CARD_WIDTH=80, CARD_HEIGHT=120
+    # 卡牌大小（根据格子大小按比例计算，让卡牌更大）
     card_scale = CELL_SIZE / 50.0
-    CARD_WIDTH = max(40, int(80 * card_scale))
-    CARD_HEIGHT = max(60, int(120 * card_scale))
-    CARD_MARGIN = max(2, int(5 * card_scale))
+    CARD_WIDTH = max(50, int(80 * card_scale))
+    CARD_HEIGHT = max(75, int(120 * card_scale))
+    CARD_MARGIN = max(3, int(5 * card_scale))
     
-    # 结束回合按钮位置和大小
-    BUTTON_X = HAND_AREA_X + HAND_AREA_WIDTH + margin
-    BUTTON_Y = HAND_AREA_Y + margin // 2
-    # 按钮大小按比例缩放
+    # 右边面板（游戏状态）
+    UI_PANEL_X = RIGHT_PANEL_X
+    UI_PANEL_Y = RIGHT_PANEL_Y
+    UI_PANEL_WIDTH = RIGHT_PANEL_WIDTH
+    UI_PANEL_HEIGHT = RIGHT_PANEL_HEIGHT
+    
+    # 结束回合按钮位置（在右边面板底部）
     button_scale = CELL_SIZE / 50.0
-    BUTTON_WIDTH = max(60, int(120 * button_scale))
-    BUTTON_HEIGHT = max(25, int(40 * button_scale))
+    BUTTON_WIDTH = max(80, int(120 * button_scale))
+    BUTTON_HEIGHT = max(30, int(40 * button_scale))
+    BUTTON_X = UI_PANEL_X + (UI_PANEL_WIDTH - BUTTON_WIDTH) // 2  # 居中
+    BUTTON_Y = UI_PANEL_Y + UI_PANEL_HEIGHT - BUTTON_HEIGHT - margin  # 底部
 
 
 # 初始化布局

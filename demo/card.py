@@ -27,7 +27,18 @@ class Card:
         return self.__str__()
     
     def create_unit(self):
-        """创建对应的兵种单位"""
+        """创建对应的兵种单位（使用卡牌原始战力）"""
         from unit import Unit
         return Unit(self.unit_type)
+    
+    def create_unit_with_power(self, power):
+        """
+        创建兵种单位，但使用指定的战力值
+        :param power: 指定的战力值
+        :return: Unit对象
+        """
+        from unit import Unit
+        unit = Unit(self.unit_type)
+        unit.power = power  # 覆盖战力值
+        return unit
 

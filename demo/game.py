@@ -264,6 +264,9 @@ class Game:
     def deploy_card(self, card, row, col):
         """
         部署卡牌到指定格子
+        规则：
+        - 可以将高数值卡牌放到低数值区域，但战力会降低到区域数值
+        - 不能将低数值卡牌放到高数值区域
         :param card: 要部署的卡牌
         :param row: 行
         :param col: 列
@@ -284,16 +287,23 @@ class Game:
         if not cell.is_revealed() or not isinstance(cell, NumberCell):
             return False
         
-        # 数字格子的数字必须匹配卡牌的兵种类型
-        if cell.number != card.unit_type:
+        # 不能部署到数字为0的格子
+        if cell.number == 0:
             return False
+        
+        # 规则：卡牌数值必须 >= 格子数值（允许高数值卡牌放到低数值区域）
+        if card.unit_type < cell.number:
+            return False  # 低数值卡牌不能放到高数值区域
         
         # 格子不能已有兵种
         if cell.has_unit():
             return False
         
         # 部署兵种
-        unit = card.create_unit()
+        # 如果卡牌数值 > 格子数值，战力会降低到格子数值
+        # 如果卡牌数值 == 格子数值，战力保持原值
+        actual_power = cell.number  # 实际战力 = 格子数值
+        unit = card.create_unit_with_power(actual_power)
         cell.deploy_unit(unit)
         
         # 从手牌移除卡牌
@@ -304,6 +314,7 @@ class Game:
     def end_turn(self):
         """
         结束当前回合
+        规则：丢弃手上现有卡牌，并重新抽牌
         :return: 是否成功结束回合
         """
         if self.game_over:
@@ -311,6 +322,9 @@ class Game:
         
         # 消耗所有激活怪物的倒计时回合
         self._consume_all_active_monsters_countdown()
+        
+        # 丢弃手上现有卡牌
+        self.hand.clear()
         
         # 发新卡牌
         self._deal_cards()
@@ -321,7 +335,7 @@ class Game:
         return True
     
     def _deal_cards(self):
-        """发牌（每回合发3张随机卡牌）"""
+        """发牌（每回合发3张随机卡牌，低数值卡牌概率更高）"""
         # 如果手牌已满，不再发牌
         if len(self.hand) >= MAX_HAND_SIZE:
             return
@@ -331,10 +345,36 @@ class Game:
         
         # 发牌
         for _ in range(cards_to_deal):
-            # 随机生成1-8的兵种类型
-            unit_type = random.randint(1, 8)
+            # 使用加权随机生成1-8的兵种类型
+            # 低数值（1-4）概率高，高数值（5-8）概率低
+            unit_type = self._weighted_random_unit_type()
             card = Card(unit_type)
             self.hand.append(card)
+    
+    def _weighted_random_unit_type(self):
+        """
+        加权随机生成兵种类型
+        低数值卡牌（1-4）有更高概率，避免卡手
+        返回: 1-8 的兵种类型
+        """
+        # 定义权重：低数值权重高，高数值权重低
+        # 1-4: 每个权重 5 (总共20)
+        # 5-6: 每个权重 2 (总共4)
+        # 7-8: 每个权重 1 (总共2)
+        # 总权重: 26
+        weights = {
+            1: 5, 2: 5, 3: 5, 4: 5,  # 低数值，高权重
+            5: 2, 6: 2,              # 中数值，中权重
+            7: 1, 8: 1               # 高数值，低权重
+        }
+        
+        # 构建加权列表
+        weighted_list = []
+        for unit_type, weight in weights.items():
+            weighted_list.extend([unit_type] * weight)
+        
+        # 从加权列表中随机选择
+        return random.choice(weighted_list)
     
     def update(self):
         """

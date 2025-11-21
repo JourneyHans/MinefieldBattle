@@ -248,8 +248,46 @@ def get_card_at_position(game, x, y):
     return None, -1
 
 
+def draw_left_panel(screen):
+    """绘制左侧操作说明面板（不显眼）"""
+    # 绘制左侧面板背景（浅灰色，不显眼）
+    left_rect = pygame.Rect(LEFT_PANEL_X, LEFT_PANEL_Y, LEFT_PANEL_WIDTH, LEFT_PANEL_HEIGHT)
+    pygame.draw.rect(screen, (220, 220, 220), left_rect)
+    pygame.draw.rect(screen, (180, 180, 180), left_rect, 1)
+    
+    # 绘制操作说明（小字体，不显眼）
+    ui_scale = LEFT_PANEL_WIDTH / 150.0
+    font_small_size = max(10, int(14 * ui_scale))
+    font_small = get_chinese_font(font_small_size)
+    
+    instructions = [
+        "操作说明:",
+        "左键点击:",
+        "  揭示格子",
+        "",
+        "拖拽卡牌:",
+        "  拖到数字格子",
+        "  部署兵种",
+        "",
+        "规则:",
+        "数字=兵种类型",
+        "卡牌需匹配",
+        "格子数字",
+        "点击结束回合",
+        "消耗倒计时"
+    ]
+    
+    y_offset = LEFT_PANEL_Y + max(10, int(15 * ui_scale))
+    small_line_spacing = max(10, int(16 * ui_scale))
+    
+    for instruction in instructions:
+        text_surface = font_small.render(instruction, True, (100, 100, 100))  # 灰色文字，不显眼
+        screen.blit(text_surface, (LEFT_PANEL_X + 5, y_offset))
+        y_offset += small_line_spacing
+
+
 def draw_ui(screen, game):
-    """绘制UI信息"""
+    """绘制右侧游戏状态UI"""
     ui_x = UI_PANEL_X
     
     # 绘制UI背景
@@ -257,17 +295,14 @@ def draw_ui(screen, game):
     pygame.draw.rect(screen, COLOR_UI_BG, ui_rect)
     
     # 绘制游戏状态（字体大小根据UI面板大小动态调整）
-    # 原始比例：UI_PANEL_WIDTH=300时，font=28, font_small=18
-    ui_scale = UI_PANEL_WIDTH / 300.0
-    font_size = max(14, int(28 * ui_scale))
-    font_small_size = max(10, int(18 * ui_scale))
-    line_spacing = max(20, int(32 * ui_scale))
-    section_spacing = max(10, int(20 * ui_scale))
+    ui_scale = UI_PANEL_WIDTH / 200.0
+    font_size = max(16, int(24 * ui_scale))
+    line_spacing = max(22, int(28 * ui_scale))
     
     font = get_chinese_font(font_size)
     state_texts = game.get_game_state_text()
     
-    y_offset = UI_PANEL_Y + max(15, int(30 * ui_scale))
+    y_offset = UI_PANEL_Y + max(15, int(20 * ui_scale))
     for text in state_texts:
         # 根据文本内容选择颜色
         if "战力优势" in text or "游戏胜利" in text:
@@ -284,34 +319,8 @@ def draw_ui(screen, game):
             color = COLOR_UI_TEXT  # 默认白色
         
         text_surface = font.render(text, True, color)
-        screen.blit(text_surface, (ui_x, y_offset))
+        screen.blit(text_surface, (ui_x + 10, y_offset))
         y_offset += line_spacing
-    
-    # 绘制操作说明
-    y_offset += section_spacing
-    font_small = get_chinese_font(font_small_size)
-    instructions = [
-        "操作说明:",
-        "左键点击:",
-        "  - 揭示格子",
-        "",
-        "拖拽卡牌:",
-        "  - 拖到数字格子",
-        "  - 部署兵种",
-        "",
-        "规则:",
-        "- 数字=兵种类型",
-        "- 卡牌类型需",
-        "  匹配格子数字",
-        "- 点击结束回合",
-        "  消耗怪物倒计时"
-    ]
-    
-    small_line_spacing = max(12, int(20 * ui_scale))
-    for instruction in instructions:
-        text_surface = font_small.render(instruction, True, COLOR_UI_TEXT)
-        screen.blit(text_surface, (ui_x, y_offset))
-        y_offset += small_line_spacing
 
 
 def main():
@@ -418,10 +427,13 @@ def main():
                     y = MAP_START_Y + CELL_MARGIN + row * (CELL_SIZE + CELL_MARGIN)
                     
                     # 如果正在拖拽卡牌，检查是否可以部署到这个格子
+                    # 规则：卡牌数值必须 >= 格子数值（允许高数值卡牌放到低数值区域）
                     highlight = False
                     if dragging_card:
                         if (cell.is_revealed() and isinstance(cell, NumberCell) and 
-                            cell.number == dragging_card.unit_type and not cell.has_unit()):
+                            cell.number > 0 and  # 不能部署到数字为0的格子
+                            cell.number <= dragging_card.unit_type and  # 卡牌数值 >= 格子数值
+                            not cell.has_unit()):
                             highlight = True
                     
                     draw_cell(screen, cell, x, y, game)
@@ -443,11 +455,14 @@ def main():
             card_y = mouse_y - drag_offset_y - CARD_HEIGHT // 2
             draw_card(screen, dragging_card, card_x, card_y, selected=True)
         
-        # 绘制结束回合按钮
-        draw_end_turn_button(screen, mouse_pos)
+        # 绘制左侧操作说明面板
+        draw_left_panel(screen)
         
-        # 绘制UI
+        # 绘制右侧游戏状态UI
         draw_ui(screen, game)
+        
+        # 绘制结束回合按钮（在右侧面板底部）
+        draw_end_turn_button(screen, mouse_pos)
         
         # 绘制游戏结束信息（字体大小根据窗口大小动态调整）
         if game.game_over:
