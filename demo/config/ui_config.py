@@ -21,8 +21,8 @@ COLOR_UI_BG = (50, 50, 50)  # UI背景 - 深灰色
 COLOR_UI_TEXT = (255, 255, 255)  # UI文字 - 白色
 
 # 窗口配置 - 固定16:9分辨率
-WINDOW_WIDTH = 640  # 窗口宽度
-WINDOW_HEIGHT = 360  # 窗口高度
+WINDOW_WIDTH = 640 * 1.5  # 窗口宽度
+WINDOW_HEIGHT = 360 * 1.5  # 窗口高度
 
 # 布局配置（将在calculate_layout()中动态计算）
 # 这些变量将在布局计算后设置
