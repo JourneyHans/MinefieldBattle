@@ -381,8 +381,8 @@ def main():
                         drag_offset_y = mouse_y - (hand_y + CARD_HEIGHT // 2)
                     else:
                         # 检查是否点击在地图区域内（揭示格子）
-                        col = (mouse_x - MAP_START_X - CELL_MARGIN) // (CELL_SIZE + CELL_MARGIN)
-                        row = (mouse_y - MAP_START_Y - CELL_MARGIN) // (CELL_SIZE + CELL_MARGIN)
+                        col = int((mouse_x - MAP_START_X - CELL_MARGIN) // (CELL_SIZE + CELL_MARGIN))
+                        row = int((mouse_y - MAP_START_Y - CELL_MARGIN) // (CELL_SIZE + CELL_MARGIN))
                         
                         if 0 <= row < MAP_HEIGHT and 0 <= col < MAP_WIDTH:
                             game.click_cell(row, col)
@@ -391,8 +391,8 @@ def main():
                     mouse_x, mouse_y = event.pos
                     
                     # 计算释放位置的格子坐标
-                    col = (mouse_x - MAP_START_X - CELL_MARGIN) // (CELL_SIZE + CELL_MARGIN)
-                    row = (mouse_y - MAP_START_Y - CELL_MARGIN) // (CELL_SIZE + CELL_MARGIN)
+                    col = int((mouse_x - MAP_START_X - CELL_MARGIN) // (CELL_SIZE + CELL_MARGIN))
+                    row = int((mouse_y - MAP_START_Y - CELL_MARGIN) // (CELL_SIZE + CELL_MARGIN))
                     
                     # 尝试部署卡牌
                     if 0 <= row < MAP_HEIGHT and 0 <= col < MAP_WIDTH:
