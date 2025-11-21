@@ -6,7 +6,7 @@
 CARD_WIDTH = 80  # 卡牌宽度（初始默认值，会被动态计算覆盖）
 CARD_HEIGHT = 120  # 卡牌高度（初始默认值，会被动态计算覆盖）
 CARD_MARGIN = 5  # 卡牌间距（初始默认值，会被动态计算覆盖）
-CARDS_PER_TURN = 3  # 每回合发牌数量
+CARDS_PER_TURN = 5  # 每回合发牌数量
 MAX_HAND_SIZE = 10  # 手牌最大数量
 
 # 兵种职业名称
