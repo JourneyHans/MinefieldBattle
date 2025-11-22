@@ -1826,8 +1826,11 @@ class WarriorDeckButton:
         # 文字颜色：WARRIOR_LIST_SLOT_TEXT_COLOR = (187, 187, 187)  # #bbb
         # 字体：使用 self.font（与勇士列表中的字体一致）
         
-        # 卡牌计数器
-        self.card_counter_values = {warrior_id: "0" for warrior_id in config.WARRIOR_LETTERS}
+        # 卡牌计数器（使用配置的默认值）
+        self.card_counter_values = {
+            warrior_id: config.WARRIOR_CARD_COUNTER_INITIAL_VALUES.get(warrior_id, "0")
+            for warrior_id in config.WARRIOR_LETTERS
+        }
         self.card_counter_active_id = None
         self.card_counter_rects = {
             warrior_id: {'input': None, 'left': None, 'right': None}
@@ -1890,6 +1893,39 @@ class WarriorDeckButton:
             print(f"绘制提示框时出错: {e}")
             import traceback
             traceback.print_exc()
+    
+    def reset_deck(self):
+        """重置牌组：清除所有勇士方块，然后根据计数器重新添加牌组到可用牌组"""
+        global warrior_blocks, warrior_deck, warrior_drop_target
+        
+        # 1. 清除棋盘上的所有勇士方块
+        warrior_blocks.clear()
+        warrior_drop_target = None
+        
+        # 2. 清除勇士列表
+        if self.game_loop_ref and hasattr(self.game_loop_ref, 'warrior_list'):
+            self.game_loop_ref.warrior_list.drawn_cards = []
+            self.game_loop_ref.warrior_list.is_dragging = False
+            self.game_loop_ref.warrior_list.dragging_letter = None
+            self.game_loop_ref.warrior_list.dragging_card_index = None
+            self.game_loop_ref.warrior_list.dragging_start_pos = None
+            self.game_loop_ref.warrior_list.dragging_slot_pos = None
+        
+        # 3. 清除牌堆和弃牌堆
+        if self.available_deck_button:
+            self.available_deck_button.deck_cards = []
+            self.available_deck_button.discard_cards = []
+        
+        # 4. 根据牌库计数器重新添加牌组到可用牌组
+        if self.available_deck_button:
+            deck_cards = []
+            for warrior_id in config.WARRIOR_LETTERS:
+                count = int(self.card_counter_values.get(warrior_id, "0") or "0")
+                warrior_name = f"步兵_{warrior_id}"
+                # 根据数量添加对应数量的卡牌
+                for _ in range(count):
+                    deck_cards.append(warrior_name)
+            self.available_deck_button.deck_cards = deck_cards
         
     def update_position(self, x, y):
         """更新按钮位置"""
@@ -1952,37 +1988,8 @@ class WarriorDeckButton:
 
                     # 统计面板区域的按钮（可能不在主窗口矩形内）
                     if confirm_button_rect and confirm_button_rect.collidepoint(mouse_pos):
-                        # 重置牌组：清除所有勇士方块，然后重新添加牌库指定的牌组
-                        global warrior_blocks, warrior_deck, warrior_drop_target
-                        
-                        # 1. 清除棋盘上的所有勇士方块
-                        warrior_blocks.clear()
-                        warrior_drop_target = None
-                        
-                        # 2. 清除勇士列表
-                        if self.game_loop_ref and hasattr(self.game_loop_ref, 'warrior_list'):
-                            self.game_loop_ref.warrior_list.drawn_cards = []
-                            self.game_loop_ref.warrior_list.is_dragging = False
-                            self.game_loop_ref.warrior_list.dragging_letter = None
-                            self.game_loop_ref.warrior_list.dragging_card_index = None
-                            self.game_loop_ref.warrior_list.dragging_start_pos = None
-                            self.game_loop_ref.warrior_list.dragging_slot_pos = None
-                        
-                        # 3. 清除牌堆和弃牌堆
-                        if self.available_deck_button:
-                            self.available_deck_button.deck_cards = []
-                            self.available_deck_button.discard_cards = []
-                        
-                        # 4. 根据牌库计数器重新添加牌组到可用牌组
-                        if self.available_deck_button:
-                            deck_cards = []
-                            for warrior_id in config.WARRIOR_LETTERS:
-                                count = int(self.card_counter_values.get(warrior_id, "0") or "0")
-                                warrior_name = f"步兵_{warrior_id}"
-                                # 根据数量添加对应数量的卡牌
-                                for _ in range(count):
-                                    deck_cards.append(warrior_name)
-                            self.available_deck_button.deck_cards = deck_cards
+                        # 重置牌组：调用重置牌组方法
+                        self.reset_deck()
                         return True
                     if clear_button_rect and clear_button_rect.collidepoint(mouse_pos):
                         # 清空所有勇士方块数量
@@ -3220,8 +3227,9 @@ def initialize_piece_land_blocks(difficulty_key):
     for i in range(danger_slots):
         block_key = all_positions[i]
         danger_land_blocks.add(block_key)
-        # 设置怪物的初始战力（普通怪物_N01，战力2）
-        set_monster_initial_power(block_key, 2)
+        # 设置怪物的初始战力（普通怪物_N01，战力2~5随机）
+        random_power = random.randint(2, 5)
+        set_monster_initial_power(block_key, random_power)
     
     # 分配安全地块（治疗草）（这些格子仍然被迷雾覆盖）
     safe_slots = min(counts['safe'], max(0, available - danger_slots))
@@ -3328,9 +3336,11 @@ def get_monster_power(block_key):
     if block_key in monster_current_power:
         return monster_current_power[block_key]
     
-    # 否则返回初始战力（目前所有危险地块都是普通怪物_N01，战力2）
+    # 否则生成随机初始战力（普通怪物_N01，战力2~5随机）并保存
     # 未来可以根据block_key或其他标识来区分不同怪物
-    return 2
+    random_power = random.randint(2, 5)
+    monster_current_power[block_key] = random_power
+    return random_power
 
 def get_monster_spirit_fire(block_key):
     """获取怪物的灵火值
@@ -3611,10 +3621,18 @@ def trigger_safe_land_block_effect(block_key):
     # 使用后从安全地块中移除，使该格子变成空格子
     safe_land_blocks.discard(block_key)
 
+def are_all_monsters_defeated():
+    """检查是否所有怪物都被消灭"""
+    global danger_land_blocks
+    return len(danger_land_blocks) == 0
+
 def trigger_endpoint_land_block_effect(block_key):
     """触发终点地块的特性（胜利）"""
     global is_game_over, is_game_won, safe_land_blocks, safe_land_block_types
     if is_game_over or is_game_won:
+        return
+    # 只有在所有怪物都被消灭时才能触发胜利
+    if not are_all_monsters_defeated():
         return
     is_game_won = True
     safe_land_blocks.discard(block_key)
@@ -3679,7 +3697,9 @@ def draw_endpoint_land_blocks(surface):
     block_size = config.CELL_SIZE - FOG_BLOCK_PADDING * 2
     
     padding_x_int, padding_y_int = get_padding_int()
-    grid_line_compensation = config.GRID_LINE_WIDTH // 2
+    
+    # 检查是否所有怪物都被消灭
+    all_monsters_defeated = are_all_monsters_defeated()
     
     # 绘制安全地块中的终点类型地块
     for block_key in safe_land_blocks:
@@ -3694,11 +3714,18 @@ def draw_endpoint_land_blocks(surface):
             land_x = padding_x_int + col * config.CELL_SIZE
             land_y = padding_y_int + row * config.CELL_SIZE
             
-            center_x = land_x + block_size / 2 + FOG_BLOCK_PADDING + grid_line_compensation
-            center_y = land_y + block_size / 2 + FOG_BLOCK_PADDING + grid_line_compensation
+            # 计算中心点（完全居中）
+            center_x = land_x + config.CELL_SIZE / 2
+            center_y = land_y + config.CELL_SIZE / 2
             radius = config.CELL_SIZE * 0.25 * 0.8
             
-            pygame.draw.circle(surface, (255, 216, 75), (int(center_x), int(center_y)), int(radius), 2)
+            # 根据任务完成状态选择颜色
+            if all_monsters_defeated:
+                # 任务完成：正常黄色圆圈
+                pygame.draw.circle(surface, (255, 216, 75), (int(center_x), int(center_y)), int(radius), 2)
+            else:
+                # 任务未完成：灰暗外观（深灰色圆圈）
+                pygame.draw.circle(surface, (100, 100, 100), (int(center_x), int(center_y)), int(radius), 2)
 
 def draw_danger_land_blocks(surface):
     """绘制危险地块（怪物方块：深红色方块，中间有红色三角形）"""
@@ -3721,11 +3748,10 @@ def draw_danger_land_blocks(surface):
             land_x = padding_x_int + col * config.CELL_SIZE
             land_y = padding_y_int + row * config.CELL_SIZE
             
-            # 地块左上角位置（与draw_fog_blocks保持一致）
-            grid_line_compensation = config.GRID_LINE_WIDTH // 2  # 网格线补偿：2/2=1像素
+            # 地块左上角位置（完全居中，每边2像素边距）
             offset = FOG_BLOCK_PADDING
-            x = land_x + offset + grid_line_compensation
-            y = land_y + offset + grid_line_compensation
+            x = land_x + offset
+            y = land_y + offset
             
             # 绘制怪物方块背景（深红色 #642828，参考勇士方块的蓝色）
             monster_rect = pygame.Rect(x, y, block_size, block_size)
@@ -3754,7 +3780,7 @@ def draw_danger_land_blocks(surface):
             pygame.draw.polygon(surface, (255, 68, 68), triangle_points)  # #ff4444
 
 def draw_warrior_blocks(surface):
-    """绘制勇士方块（蓝色方块和字母）"""
+    """绘制勇士方块（蓝色方块和数字）"""
     # 迷雾方块参数（与draw_fog_blocks保持一致）
     FOG_BLOCK_PADDING = 2  # 迷雾方块边距（每边2像素）
     block_size = config.CELL_SIZE - FOG_BLOCK_PADDING * 2  # 地块大小
@@ -3784,26 +3810,26 @@ def draw_warrior_blocks(surface):
             land_x = padding_x_int + col * config.CELL_SIZE
             land_y = padding_y_int + row * config.CELL_SIZE
             
-            # 地块左上角位置（与draw_fog_blocks保持一致）
-            grid_line_compensation = config.GRID_LINE_WIDTH // 2  # 网格线补偿：2/2=1像素
+            # 地块左上角位置（完全居中，每边2像素边距）
             offset = FOG_BLOCK_PADDING
-            x = land_x + offset + grid_line_compensation
-            y = land_y + offset + grid_line_compensation
+            x = land_x + offset
+            y = land_y + offset
             
-            # 绘制勇士方块背景（蓝色 #4a9eff）
+            # 绘制勇士方块背景（深蓝色）
             warrior_rect = pygame.Rect(x, y, block_size, block_size)
             
             # 检测鼠标悬停
             if mouse_pos is not None and warrior_rect.collidepoint(mouse_pos):
                 hovered_board_warrior = (warrior_letter, block_key, warrior_rect.copy())
             
-            pygame.draw.rect(surface, (74, 158, 255), warrior_rect)  # #4a9eff
+            pygame.draw.rect(surface, (30, 70, 140), warrior_rect)  # 深蓝色，提高与数字的对比度
             
-            # 绘制勇士字母（灰色 #bbb，格子大小的50%）
-            # 创建字体（格子大小的50%）
+            # 绘制勇士数字（与牌库中的勇士方块一致）
+            # 创建字体（格子大小的50%），使用与牌库相同的字体获取方式
             font_size = int(config.CELL_SIZE * 0.5)
-            warrior_font = pygame.font.Font(None, font_size)
-            letter_surface = warrior_font.render(warrior_letter, True, (187, 187, 187))  # #bbb
+            warrior_font = get_font_with_fallback(font_size)
+            # 使用与牌库相同的颜色配置
+            letter_surface = warrior_font.render(warrior_letter, True, config.WARRIOR_LIST_SLOT_TEXT_COLOR)
             letter_rect = letter_surface.get_rect(center=(x + block_size / 2, y + block_size / 2))
             surface.blit(letter_surface, letter_rect)
 
@@ -3870,11 +3896,10 @@ def draw_number_hints(surface):
                     land_x = padding_x_int + col * config.CELL_SIZE
                     land_y = padding_y_int + row * config.CELL_SIZE
                     
-                    # 地块左上角位置（与draw_fog_blocks保持一致）
-                    grid_line_compensation = config.GRID_LINE_WIDTH // 2  # 网格线补偿：2/2=1像素
+                    # 地块左上角位置（完全居中，每边2像素边距）
                     offset = FOG_BLOCK_PADDING
-                    x = land_x + offset + grid_line_compensation
-                    y = land_y + offset + grid_line_compensation
+                    x = land_x + offset
+                    y = land_y + offset
                     
                     # 绘制背景矩形
                     bg_rect = pygame.Rect(x, y, block_size, block_size)
@@ -4033,14 +4058,9 @@ def draw_fog_blocks(surface):
         land_x = padding_x_int + col * config.CELL_SIZE
         land_y = padding_y_int + row * config.CELL_SIZE
         
-        # 迷雾格子左上角位置：土地格子左上角 + 偏移量 + 网格线补偿偏移
-        # 偏移原因：网格线宽度为2像素，绘制时线条中心在格子边界，向两边各扩展1像素
-        # 这意味着网格线会占用格子内部1像素，导致视觉上的偏移
-        # 为了视觉平衡，需要补偿网格线占用的空间：右移1像素（补偿左边网格线），下移1像素（补偿上边网格线）
-        # 参考开发记录 #001：网格线宽度对视觉居中的影响
-        grid_line_compensation = config.GRID_LINE_WIDTH // 2  # 网格线补偿：2/2=1像素
-        fog_x = land_x + offset + grid_line_compensation  # 右移1像素补偿左边网格线
-        fog_y = land_y + offset + grid_line_compensation  # 下移1像素补偿上边网格线
+        # 迷雾格子左上角位置：土地格子左上角 + 偏移量（完全居中，每边2像素边距）
+        fog_x = land_x + offset
+        fog_y = land_y + offset
         
         # 绘制迷雾方块（根据格子大小动态计算）
         # 如果该格子处于暴露状态，使用半透明颜色（加强不透明度，让暴露图标更不明显）
@@ -4078,11 +4098,10 @@ def draw_exposed_pieces_on_fog(surface):
         land_x = padding_x_int + col * config.CELL_SIZE
         land_y = padding_y_int + row * config.CELL_SIZE
         
-        # 地块左上角位置（与draw_fog_blocks保持一致）
-        grid_line_compensation = config.GRID_LINE_WIDTH // 2  # 网格线补偿：2/2=1像素
+        # 地块左上角位置（完全居中，每边2像素边距）
         offset = FOG_BLOCK_PADDING
-        x = land_x + offset + grid_line_compensation
-        y = land_y + offset + grid_line_compensation
+        x = land_x + offset
+        y = land_y + offset
         
         # 创建半透明surface用于绘制怪物方块
         monster_surface = pygame.Surface((block_size, block_size), pygame.SRCALPHA)
@@ -4145,12 +4164,21 @@ def draw_exposed_pieces_on_fog(surface):
                 pygame.draw.rect(square_surface, (68, 255, 68, int(255 * 0.6)), rect)  # rgba(68, 255, 68, 0.6)
                 surface.blit(square_surface, (padding_x_int + col * config.CELL_SIZE, padding_y_int + row * config.CELL_SIZE))
             elif block_type == 'endpoint':
-                # 终点：绘制黄色圆圈（半透明）
+                # 终点：根据任务完成状态绘制不同外观（半透明）
                 radius = config.CELL_SIZE * 0.25 * 0.8
                 circle_surface = pygame.Surface((config.CELL_SIZE, config.CELL_SIZE), pygame.SRCALPHA)
-                pygame.draw.circle(circle_surface, (255, 216, 75, int(255 * 0.6)),
-                                  (int(config.CELL_SIZE / 2), int(config.CELL_SIZE / 2)),
-                                  int(radius), 2)
+                # 检查是否所有怪物都被消灭
+                all_monsters_defeated = are_all_monsters_defeated()
+                if all_monsters_defeated:
+                    # 任务完成：正常黄色圆圈（半透明）
+                    pygame.draw.circle(circle_surface, (255, 216, 75, int(255 * 0.6)),
+                                      (int(config.CELL_SIZE / 2), int(config.CELL_SIZE / 2)),
+                                      int(radius), 2)
+                else:
+                    # 任务未完成：灰暗外观（深灰色圆圈，半透明）
+                    pygame.draw.circle(circle_surface, (100, 100, 100, int(255 * 0.6)),
+                                      (int(config.CELL_SIZE / 2), int(config.CELL_SIZE / 2)),
+                                      int(radius), 2)
                 surface.blit(circle_surface, (padding_x_int + col * config.CELL_SIZE, padding_y_int + row * config.CELL_SIZE))
 
 def get_danger_exposed_tooltip_lines(block_key):
@@ -4177,10 +4205,25 @@ def get_safe_exposed_tooltip_lines(block_key):
             '效果：恢复1点生命'
         ]
     elif block_type == 'endpoint':
-        return [
-            '名称：终点',
-            '效果：点击后立即获得胜利'
-        ]
+        # 检查是否所有怪物都被消灭
+        all_monsters_defeated = are_all_monsters_defeated()
+        global danger_land_blocks
+        remaining_monsters = len(danger_land_blocks)
+        
+        if all_monsters_defeated:
+            return [
+                '名称：终点',
+                '任务目标：消灭所有怪物',
+                '状态：已完成',
+                '点击后获得胜利'
+            ]
+        else:
+            return [
+                '名称：终点',
+                '任务目标：消灭所有怪物',
+                f'状态：剩余{remaining_monsters}个怪物',
+                '完成目标后可点击'
+            ]
     return []
 
 def calculate_warrior_power_statistics(monster_key):
@@ -4422,11 +4465,11 @@ def draw_warrior_power_statistics(surface, monster_key, x, y, target_height=None
             plus_rect = plus_surface.get_rect(center=(plus_x + plus_symbol_width / 2, plus_y))
             tooltip_surface.blit(plus_surface, plus_rect)
         
-        # 绘制勇士方块（蓝色方块 + 灰色字母）
+        # 绘制勇士方块（深蓝色方块 + 灰色字母）
         block_x = unit_center_x - warrior_block_size / 2
         block_y = unit_start_y
         warrior_rect = pygame.Rect(block_x, block_y, warrior_block_size, warrior_block_size)
-        pygame.draw.rect(tooltip_surface, (74, 158, 255), warrior_rect)  # 蓝色背景 #4a9eff
+        pygame.draw.rect(tooltip_surface, (30, 70, 140), warrior_rect)  # 深蓝色背景，与棋盘上的勇士方块一致
         
         # 绘制勇士字母（灰色）
         letter_font_size = int(warrior_block_size * 0.5)
@@ -4940,7 +4983,6 @@ def draw_marks(surface):
     # 迷雾方块参数（与draw_fog_blocks保持一致）
     FOG_BLOCK_PADDING = 2  # 迷雾方块边距（每边2像素）
     FOG_BLOCK_SIZE = config.CELL_SIZE - FOG_BLOCK_PADDING * 2  # 迷雾格子大小
-    grid_line_compensation = config.GRID_LINE_WIDTH // 2  # 网格线补偿：2/2=1像素
     
     # 使用统一的整数基准，确保像素对齐
     padding_x_int, padding_y_int = get_padding_int()
@@ -4959,10 +5001,10 @@ def draw_marks(surface):
         land_x = padding_x_int + col * config.CELL_SIZE
         land_y = padding_y_int + row * config.CELL_SIZE
         
-        # 迷雾方块左上角位置（与draw_fog_blocks保持一致）
+        # 迷雾方块左上角位置（完全居中，每边2像素边距）
         offset = FOG_BLOCK_PADDING
-        fog_x = land_x + offset + grid_line_compensation
-        fog_y = land_y + offset + grid_line_compensation
+        fog_x = land_x + offset
+        fog_y = land_y + offset
         
         # 迷雾方块中心位置（标记应该绘制在迷雾方块中心，而不是格子中心）
         center_x = fog_x + FOG_BLOCK_SIZE / 2
@@ -5023,7 +5065,7 @@ def draw_game_win(surface):
     font_size = 60
     win_font = get_font_with_fallback(font_size, bold=True)
     
-    text_surface = win_font.render('终点达成', True, (255, 216, 75))
+    text_surface = win_font.render('游戏胜利', True, (255, 216, 75))
     text_rect = text_surface.get_rect(center=(window_width / 2, window_height / 2))
     surface.blit(text_surface, text_rect)
 
@@ -5042,7 +5084,6 @@ def draw_hover_highlight(surface):
         # 迷雾方块参数（与draw_fog_blocks保持一致）
         FOG_BLOCK_PADDING = 2  # 迷雾方块边距（每边2像素）
         FOG_BLOCK_SIZE = config.CELL_SIZE - FOG_BLOCK_PADDING * 2  # 迷雾格子大小
-        grid_line_compensation = config.GRID_LINE_WIDTH // 2  # 网格线补偿：2/2=1像素
         
         # 使用统一的整数基准，确保像素对齐
         padding_x_int, padding_y_int = get_padding_int()
@@ -5051,10 +5092,10 @@ def draw_hover_highlight(surface):
         land_x = padding_x_int + col * config.CELL_SIZE
         land_y = padding_y_int + row * config.CELL_SIZE
         
-        # 迷雾方块左上角位置（与draw_fog_blocks保持一致）
+        # 迷雾方块左上角位置（完全居中，每边2像素边距）
         offset = FOG_BLOCK_PADDING
-        fog_x = land_x + offset + grid_line_compensation
-        fog_y = land_y + offset + grid_line_compensation
+        fog_x = land_x + offset
+        fog_y = land_y + offset
         
         # 绘制半透明白色覆盖（rgba(255, 255, 255, 0.2)）
         highlight_surface = pygame.Surface((FOG_BLOCK_SIZE, FOG_BLOCK_SIZE), pygame.SRCALPHA)
@@ -5355,6 +5396,12 @@ class GameLoop:
         
         # 根据当前难度初始化网格大小（这已经包含了initialize_blocks、initialize_piece_land_blocks和update_padding）
         self.difficulty_selector.update_difficulty()
+        
+        # 每次开局时执行一次重置牌组
+        self.warrior_deck_button.reset_deck()
+        
+        # 每次开局时执行一次重置牌组
+        self.warrior_deck_button.reset_deck()
     
     def handle_events(self):
         """处理所有事件"""
@@ -5568,8 +5615,13 @@ class GameLoop:
                                         # 使用治疗草（恢复生命）
                                         trigger_safe_land_block_effect(block_key)
                                     elif block_type == 'endpoint':
-                                        # 触发胜利
-                                        trigger_endpoint_land_block_effect(block_key)
+                                        # 只有在所有怪物都被消灭时才能点击终点
+                                        if are_all_monsters_defeated():
+                                            # 消耗灵火值（点击终点是行动）
+                                            consume_spirit_fire()
+                                            # 触发胜利
+                                            trigger_endpoint_land_block_effect(block_key)
+                                        # 如果任务未完成，不执行任何操作（终点无法点击）
                         
                         elif event.button == 3:  # 右键点击
                             # 如果游戏失败或已获胜，禁用右键标记
