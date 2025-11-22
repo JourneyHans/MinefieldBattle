@@ -1,0 +1,30 @@
+游戏启动说明
+================
+
+这是一个可以启动的游戏备份版本。
+
+启动方法：
+1. 确保已安装 Python 3.9 或更高版本
+2. 安装依赖：pip install -r requirements.txt
+3. 运行游戏：python game.py
+
+备份时间：2025年（当前版本）
+备份位置：G:\SparkProject\MinefieldBattle\DemoLee
+
+包含文件：
+- game.py (主程序)
+- config.py (配置文件)
+- draw_system.py (绘制系统)
+- font_manager.py (字体管理器)
+- game_window.py (游戏窗口)
+- requirements.txt (依赖列表)
+- README.md (项目说明)
+
+游戏功能：
+- 三种地图大小：9×9、16×16、16×30
+- 迷雾探索系统
+- 勇士放置和战斗系统
+- 撤回勇士功能（已修复）
+- 标记系统
+- 生命值和灵火值系统
+
