@@ -78,12 +78,10 @@ DIFFICULTIES = {
 # 默认难度
 DEFAULT_DIFFICULTY = 'easy'  # 默认9×9地图
 
-# 根据难度获取格子大小（9×9地图放大30%）
+# 根据难度获取格子大小（所有难度统一为46像素，与9×9地图一致）
 def get_cell_size(difficulty):
     """根据难度获取格子大小"""
-    if difficulty == 'easy':
-        return int(BASE_CELL_SIZE * 1.3)  # 9×9地图放大30%
-    return BASE_CELL_SIZE  # 其他难度保持原大小
+    return int(BASE_CELL_SIZE * 1.3)  # 所有难度统一放大30%为46像素
 
 # 根据难度获取棋子地块数量
 def get_piece_land_block_counts(difficulty):
@@ -127,7 +125,7 @@ HEALTH_BAR_BORDER_WIDTH = 3  # 血条边框宽度（像素）
 HEALTH_BAR_PADDING = 3  # 血条内边距（像素）
 
 # ==================== 灵火配置 ====================
-MAX_SPIRIT_FIRE = 5  # 最大灵火值
+MAX_SPIRIT_FIRE = 8  # 最大灵火值
 SPIRIT_FIRE_BAR_HEIGHT = 35  # 灵火条高度（像素）
 SPIRIT_FIRE_BAR_WIDTH = 200  # 灵火条固定宽度（像素）
 SPIRIT_FIRE_BAR_Y = 20  # 灵火条距离画面上方（像素）

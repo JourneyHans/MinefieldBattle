@@ -41,6 +41,13 @@ shake_offset_y = 0
 DEFAULT_SHAKE_DURATION = 280  # 毫秒
 DEFAULT_SHAKE_MAGNITUDE = 6
 
+# 棋盘拖拽状态
+is_dragging_board = False  # 是否正在拖拽棋盘
+board_drag_start_x = 0  # 拖拽起始鼠标X坐标
+board_drag_start_y = 0  # 拖拽起始鼠标Y坐标
+board_drag_offset_x = 0  # 棋盘拖拽偏移量X（相对于居中位置的偏移）
+board_drag_offset_y = 0  # 棋盘拖拽偏移量Y（相对于居中位置的偏移）
+
 # 迷雾方块：使用set存储有迷雾方块的格子坐标 "row,col"
 blocks = set()
 
@@ -171,8 +178,8 @@ def update_screen_shake():
 
 
 def get_padding_values():
-    """返回包含震动偏移的浮点内边距"""
-    return PADDING_X + shake_offset_x, PADDING_Y + shake_offset_y
+    """返回包含震动偏移和拖拽偏移的浮点内边距"""
+    return PADDING_X + shake_offset_x + board_drag_offset_x, PADDING_Y + shake_offset_y + board_drag_offset_y
 
 
 def get_padding_int():
@@ -2828,11 +2835,17 @@ class AvailableDeckWindowButton:
 def reset_game(difficulty_key=None, game_loop_ref=None):
     """重置游戏"""
     global blocks, marked_blocks, current_hp, current_spirit_fire, spirit_fire_zero_pending, danger_land_blocks, safe_land_blocks, safe_land_block_types, used_safe_land_blocks, discovered_hint_blocks, reveal_animation, reveal_animation_data, warrior_blocks, warrior_deck, is_game_over, is_game_won, start_area, warrior_drop_target, monster_current_power
+    global board_drag_offset_x, board_drag_offset_y, is_dragging_board
     
     # 取消正在进行的动画
     reveal_animation = None
     reveal_animation_data = None
     stop_screen_shake()
+    
+    # 重置棋盘拖拽偏移量
+    board_drag_offset_x = 0
+    board_drag_offset_y = 0
+    is_dragging_board = False
     
     # 获取当前难度（如果未提供，使用默认难度）
     if difficulty_key is None:
@@ -2943,6 +2956,10 @@ def has_no_fog_around(row, col):
                     return False
     return True
 
+def is_corner(row, col):
+    """判断指定格子是否位于棋盘的角落"""
+    return (row == 0 or row == config.GRID_ROWS - 1) and (col == 0 or col == config.GRID_COLS - 1)
+
 def should_expose_safe_block(block_key, opened_count, row, col):
     """判断安全地块是否应该暴露（根据各子项决定）"""
     if block_key not in safe_land_blocks:
@@ -2964,6 +2981,7 @@ def update_discovered_hints():
     discovered_hint_blocks.clear()
     
     # 危险地块：周围8格中有3个迷雾格子被打开；暴露条件：4个空白格子
+    # 特殊规则：如果怪物位于角落，只要周围没有迷雾格子，就会暴露
     for block_key in danger_land_blocks:
         # 仅对仍在迷雾中的地块进行提示
         if block_key not in blocks:
@@ -2977,7 +2995,19 @@ def update_discovered_hints():
         opened_count = count_opened_around(row, col)
         if opened_count >= 3:
             discovered_hint_blocks.add(block_key)
-        if opened_count >= 4:
+        
+        # 检查暴露条件
+        should_expose = False
+        if is_corner(row, col):
+            # 如果在角落，只要周围没有迷雾格子，就会暴露
+            if has_no_fog_around(row, col):
+                should_expose = True
+        else:
+            # 普通情况：周围8格中有4个空白格子
+            if opened_count >= 4:
+                should_expose = True
+        
+        if should_expose:
             exposed_danger_blocks.add(block_key)
             discovered_hint_blocks.discard(block_key)  # 暴露后不再使用被发现提示
         else:
@@ -5405,6 +5435,11 @@ class GameLoop:
     
     def handle_events(self):
         """处理所有事件"""
+        global hovered_cell, is_game_over, is_game_won, warrior_drop_target
+        global is_dragging_board, board_drag_offset_x, board_drag_offset_y
+        global board_drag_start_x, board_drag_start_y
+        global total_piece_count, total_danger_count, total_safe_count
+        
         deck_buttons = [self.available_deck_button, self.warrior_deck_button]
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -5418,8 +5453,65 @@ class GameLoop:
             
             # 处理鼠标移动事件（需要先处理，用于悬停高亮）
             if event.type == pygame.MOUSEMOTION:
-                global hovered_cell, is_game_over, is_game_won, warrior_drop_target
                 mouse_x, mouse_y = pygame.mouse.get_pos()
+                
+                # 处理棋盘拖拽（中键拖拽）
+                if is_dragging_board:
+                    # 计算鼠标移动的距离
+                    dx = mouse_x - board_drag_start_x
+                    dy = mouse_y - board_drag_start_y
+                    
+                    # 计算棋盘和窗口尺寸
+                    window_width, window_height = window.get_size()
+                    GRID_WIDTH = config.GRID_COLS * config.CELL_SIZE
+                    GRID_HEIGHT = config.GRID_ROWS * config.CELL_SIZE
+                    
+                    # 计算新的偏移量（直接加上鼠标移动的距离）
+                    new_offset_x = board_drag_offset_x + dx
+                    new_offset_y = board_drag_offset_y + dy
+                    
+                    # 限制拖拽范围：确保棋盘不会被拖拽到完全看不到的位置
+                    # 根据难度调整拖拽范围系数
+                    if config.GRID_ROWS == 16 and config.GRID_COLS == 30:
+                        # hard难度（16×30）：考虑右侧UI遮挡（勇士列表等）
+                        # 勇士列表宽度240 + 右侧间距15 = 255像素
+                        right_ui_width = config.WARRIOR_LIST_WIDTH + 15
+                        
+                        # 允许棋盘向左拖拽，使得棋盘右侧可以完全避开UI
+                        # 最大左拖拽：棋盘宽度 - (窗口宽度 - UI宽度) + 一些余量
+                        # 这样可以浏览到棋盘的右边缘
+                        max_left_drag = GRID_WIDTH - (window_width - right_ui_width) + 50  # 50像素余量
+                        
+                        # 右侧拖拽范围保持较小（因为左侧已经有足够空间）
+                        max_right_drag = max(100, abs(GRID_WIDTH - window_width) * 0.3)
+                        
+                        # 由于棋盘默认居中，初始偏移为0时棋盘中心在窗口中心
+                        # 最大左偏移（负数）和最大右偏移（正数）
+                        max_offset_x = max(max_left_drag, max_right_drag)
+                        max_offset_y = max(100, abs(GRID_HEIGHT - window_height) * 0.98)
+                    elif config.GRID_ROWS == 16 and config.GRID_COLS == 16:
+                        # normal难度（16×16）：允许拖拽到棋盘大小的50%
+                        drag_ratio_x = 0.5
+                        drag_ratio_y = 0.5
+                        max_offset_x = max(100, abs(GRID_WIDTH - window_width) * drag_ratio_x)
+                        max_offset_y = max(100, abs(GRID_HEIGHT - window_height) * drag_ratio_y)
+                    else:
+                        # easy难度（9×9）：允许拖拽到棋盘大小的50%
+                        drag_ratio_x = 0.5
+                        drag_ratio_y = 0.5
+                        max_offset_x = max(100, abs(GRID_WIDTH - window_width) * drag_ratio_x)
+                        max_offset_y = max(100, abs(GRID_HEIGHT - window_height) * drag_ratio_y)
+                    
+                    # 应用限制
+                    board_drag_offset_x = max(-max_offset_x, min(max_offset_x, new_offset_x))
+                    board_drag_offset_y = max(-max_offset_y, min(max_offset_y, new_offset_y))
+                    
+                    # 更新拖拽起始位置为当前位置
+                    board_drag_start_x = mouse_x
+                    board_drag_start_y = mouse_y
+                    
+                    # 拖拽时不处理其他鼠标事件
+                    continue
                 
                 # 如果任意牌库窗口打开，优先处理窗口事件
                 deck_window_active = False
@@ -5520,6 +5612,136 @@ class GameLoop:
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_x, mouse_y = pygame.mouse.get_pos()
                 ui_clicked = False
+                
+                # 处理鼠标中键按下（开始拖拽棋盘）
+                if event.button == 2:  # 中键
+                    # 检查是否点击在UI组件上
+                    mouse_on_ui = False
+                    
+                    # 检查分辨率选择器
+                    res_button_rect = pygame.Rect(
+                        self.resolution_selector.button_x,
+                        self.resolution_selector.button_y,
+                        self.resolution_selector.button_width,
+                        self.resolution_selector.button_height
+                    )
+                    if res_button_rect.collidepoint(mouse_x, mouse_y):
+                        mouse_on_ui = True
+                    if self.resolution_selector.open:
+                        for i in range(len(self.resolution_selector.options)):
+                            option_y = self.resolution_selector.button_y + self.resolution_selector.button_height + i * self.resolution_selector.option_height
+                            option_rect = pygame.Rect(
+                                self.resolution_selector.button_x,
+                                option_y,
+                                self.resolution_selector.options_box_width,
+                                self.resolution_selector.option_height
+                            )
+                            if option_rect.collidepoint(mouse_x, mouse_y):
+                                mouse_on_ui = True
+                                break
+                    
+                    # 检查难度选择器
+                    diff_button_rect = pygame.Rect(
+                        self.difficulty_selector.button_x,
+                        self.difficulty_selector.button_y,
+                        self.difficulty_selector.button_width,
+                        self.difficulty_selector.button_height
+                    )
+                    if diff_button_rect.collidepoint(mouse_x, mouse_y):
+                        mouse_on_ui = True
+                    if self.difficulty_selector.open:
+                        for i in range(len(self.difficulty_selector.options)):
+                            option_y = self.difficulty_selector.button_y + self.difficulty_selector.button_height + i * self.difficulty_selector.option_height
+                            option_rect = pygame.Rect(
+                                self.difficulty_selector.button_x,
+                                option_y,
+                                self.difficulty_selector.options_box_width,
+                                self.difficulty_selector.option_height
+                            )
+                            if option_rect.collidepoint(mouse_x, mouse_y):
+                                mouse_on_ui = True
+                                break
+                    
+                    # 检查重置按钮
+                    reset_button_rect = pygame.Rect(self.reset_button.x, self.reset_button.y, 
+                                                   self.reset_button.width, self.reset_button.height)
+                    if reset_button_rect.collidepoint(mouse_x, mouse_y):
+                        mouse_on_ui = True
+                    
+                    # 检查勇士列表
+                    warrior_list_rect = pygame.Rect(self.warrior_list.x, self.warrior_list.y,
+                                                   self.warrior_list.width, self.warrior_list.height)
+                    if warrior_list_rect.collidepoint(mouse_x, mouse_y):
+                        mouse_on_ui = True
+                    
+                    # 检查勇士牌库按钮
+                    warrior_deck_button_rect = pygame.Rect(self.warrior_deck_button.x, self.warrior_deck_button.y,
+                                                          self.warrior_deck_button.width, self.warrior_deck_button.height)
+                    if warrior_deck_button_rect.collidepoint(mouse_x, mouse_y):
+                        mouse_on_ui = True
+                    # 检查勇士牌库窗口（如果打开）
+                    if self.warrior_deck_button.open:
+                        window_rect = self.warrior_deck_button.get_window_rect()
+                        if window_rect.collidepoint(mouse_x, mouse_y):
+                            mouse_on_ui = True
+                    
+                    # 检查可用牌组按钮
+                    available_deck_button_rect = pygame.Rect(self.available_deck_button.x, self.available_deck_button.y,
+                                                            self.available_deck_button.width, self.available_deck_button.height)
+                    if available_deck_button_rect.collidepoint(mouse_x, mouse_y):
+                        mouse_on_ui = True
+                    # 检查可用牌组窗口（如果打开）
+                    if self.available_deck_button.open:
+                        window_rect = self.available_deck_button.get_window_rect()
+                        if window_rect.collidepoint(mouse_x, mouse_y):
+                            mouse_on_ui = True
+                    
+                    # 检查血条和灵火条区域（位于顶部）
+                    window_width, window_height = window.get_size()
+                    health_bar_rect = pygame.Rect(config.HEALTH_BAR_LABEL_X - config.HEALTH_BAR_LABEL_SPACING,
+                                                 config.HEALTH_BAR_Y,
+                                                 config.HEALTH_BAR_WIDTH + config.HEALTH_BAR_LABEL_SPACING * 2,
+                                                 config.HEALTH_BAR_HEIGHT)
+                    if health_bar_rect.collidepoint(mouse_x, mouse_y):
+                        mouse_on_ui = True
+                    
+                    spirit_fire_bar_x = health_bar_rect.right + config.SPIRIT_FIRE_BAR_SPACING
+                    spirit_fire_bar_rect = pygame.Rect(spirit_fire_bar_x,
+                                                      config.SPIRIT_FIRE_BAR_Y,
+                                                      config.SPIRIT_FIRE_BAR_WIDTH,
+                                                      config.SPIRIT_FIRE_BAR_HEIGHT)
+                    if spirit_fire_bar_rect.collidepoint(mouse_x, mouse_y):
+                        mouse_on_ui = True
+                    
+                    # 检查统计信息框（左下角）
+                    if total_piece_count > 0:
+                        stats_padding = 12
+                        stats_line_height = 18
+                        stats_lines = [
+                            '地块信息统计',
+                            f'棋子地块：{total_piece_count}',
+                            f'危险地块：{total_danger_count}',
+                            f'安全地块：{total_safe_count}'
+                        ]
+                        stats_box_height = stats_line_height * len(stats_lines) + stats_padding * 2
+                        stats_font = get_font_with_fallback(14)
+                        stats_width = 0
+                        for line in stats_lines:
+                            text_surface = stats_font.render(line, True, (255, 255, 255))
+                            stats_width = max(stats_width, text_surface.get_width())
+                        stats_box_width = stats_width + stats_padding * 2
+                        stats_box_rect = pygame.Rect(12, window_height - stats_box_height - 12,
+                                                    stats_box_width, stats_box_height)
+                        if stats_box_rect.collidepoint(mouse_x, mouse_y):
+                            mouse_on_ui = True
+                    
+                    # 如果不在UI组件上，开始拖拽
+                    if not mouse_on_ui:
+                        is_dragging_board = True
+                        board_drag_start_x = mouse_x
+                        board_drag_start_y = mouse_y
+                        # 中键拖拽时，不处理其他事件
+                        continue
                 
                 # 优先处理任意牌库窗口（如果打开，阻止所有其他事件）
                 # 特别注意：如果正在调整大小，必须处理 MOUSEBUTTONUP 事件来停止调整
@@ -5639,6 +5861,16 @@ class GameLoop:
             
             # 处理鼠标释放事件（用于重置按钮的点击确认和勇士拖拽释放）
             elif event.type == pygame.MOUSEBUTTONUP:
+                # 处理鼠标中键释放（结束拖拽棋盘）
+                if event.button == 2:  # 中键释放
+                    if is_dragging_board:
+                        # 结束拖拽（偏移量已经在移动过程中更新）
+                        is_dragging_board = False
+                        board_drag_start_x = 0
+                        board_drag_start_y = 0
+                        # 中键释放时，不处理其他事件
+                        continue
+                
                 if event.button == 1:  # 左键释放
                     # 优先处理所有牌库窗口的调整大小停止（如果正在调整大小）
                     resizing_handled = False
