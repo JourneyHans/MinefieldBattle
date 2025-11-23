@@ -41,8 +41,6 @@ def draw_cell(screen, cell, x, y, game=None):
                 color = COLOR_MONSTER_LOST
             else:  # 怪物胜利
                 color = COLOR_MONSTER_WON
-        elif cell.triggered and cell.is_countdown_active():
-            color = COLOR_COUNTDOWN
         elif cell.state == CellState.REVEALED:
             color = COLOR_MONSTER
         else:
@@ -60,29 +58,6 @@ def draw_cell(screen, cell, x, y, game=None):
     # 绘制格子
     pygame.draw.rect(screen, color, rect)
     pygame.draw.rect(screen, COLOR_TEXT, rect, 1)  # 边框
-    
-    # 如果是激活的怪物，在格子上方显示倒计时数字
-    if isinstance(cell, MonsterCell) and cell.is_countdown_active():
-        countdown = cell.get_countdown_remaining()
-        if countdown > 0:
-            # 在格子上方绘制倒计时数字（字体大小根据格子大小动态调整）
-            # 原始比例：CELL_SIZE=50时，font=20
-            countdown_font_size = max(10, int(20 * (CELL_SIZE / 50.0)))
-            countdown_font = get_chinese_font(countdown_font_size)
-            countdown_text = countdown_font.render(str(countdown), True, (255, 255, 0))  # 黄色
-            countdown_rect = countdown_text.get_rect()
-            countdown_rect.centerx = x + CELL_SIZE // 2
-            countdown_offset = max(8, int(12 * (CELL_SIZE / 50.0)))
-            countdown_rect.centery = y - countdown_offset  # 在格子上方
-            # 绘制半透明背景（圆形或圆角矩形）
-            bg_radius = max(countdown_rect.width, countdown_rect.height) // 2 + 4
-            bg_rect = pygame.Rect(countdown_rect.centerx - bg_radius, 
-                                countdown_rect.centery - bg_radius,
-                                bg_radius * 2, bg_radius * 2)
-            bg_surface = pygame.Surface((bg_rect.width, bg_rect.height), pygame.SRCALPHA)
-            pygame.draw.circle(bg_surface, (0, 0, 0, 200), (bg_radius, bg_radius), bg_radius)
-            screen.blit(bg_surface, bg_rect)
-            screen.blit(countdown_text, countdown_rect)
     
     # 绘制文字
     if cell.is_revealed():
@@ -248,6 +223,57 @@ def get_card_at_position(game, x, y):
     return None, -1
 
 
+def draw_health_bar(screen, game):
+    """在窗口顶部绘制生命值血条"""
+    from config_mgr import INITIAL_HEALTH
+    
+    # 血条配置
+    bar_height = max(30, int(WINDOW_HEIGHT * 0.04))
+    bar_y = max(5, int(WINDOW_HEIGHT * 0.01))
+    bar_width = int(WINDOW_WIDTH * 0.3)  # 血条宽度为窗口宽度的30%
+    bar_x = (WINDOW_WIDTH - bar_width) // 2  # 居中
+    
+    # 计算生命值百分比
+    health_percent = max(0.0, min(1.0, game.health / INITIAL_HEALTH))
+    
+    # 根据生命值百分比计算颜色（绿色→黄色→红色）
+    if health_percent > 0.6:
+        # 绿色到黄色
+        r = int(255 * (1.0 - (health_percent - 0.6) / 0.4))
+        g = 255
+        b = 0
+    elif health_percent > 0.3:
+        # 黄色到红色
+        r = 255
+        g = int(255 * ((health_percent - 0.3) / 0.3))
+        b = 0
+    else:
+        # 红色
+        r = 255
+        g = 0
+        b = 0
+    
+    # 绘制血条背景（深灰色）
+    bg_rect = pygame.Rect(bar_x, bar_y, bar_width, bar_height)
+    pygame.draw.rect(screen, (50, 50, 50), bg_rect)
+    pygame.draw.rect(screen, (100, 100, 100), bg_rect, 2)
+    
+    # 绘制血条（当前生命值）
+    if health_percent > 0:
+        health_rect = pygame.Rect(bar_x, bar_y, int(bar_width * health_percent), bar_height)
+        pygame.draw.rect(screen, (r, g, b), health_rect)
+    
+    # 绘制文字标签
+    font_size = max(16, int(bar_height * 0.6))
+    font = get_chinese_font(font_size)
+    label_text = f"生命值: {game.health}/{INITIAL_HEALTH}"
+    text_surface = font.render(label_text, True, COLOR_UI_TEXT)
+    text_rect = text_surface.get_rect()
+    text_rect.centerx = bar_x + bar_width // 2
+    text_rect.centery = bar_y + bar_height // 2
+    screen.blit(text_surface, text_rect)
+
+
 def draw_left_panel(screen):
     """绘制左侧操作说明面板（不显眼）"""
     # 绘制左侧面板背景（浅灰色，不显眼）
@@ -286,35 +312,99 @@ def draw_left_panel(screen):
         y_offset += small_line_spacing
 
 
-def draw_ui(screen, game):
-    """绘制右侧游戏状态UI"""
+def get_hovered_object(game, mouse_x, mouse_y):
+    """
+    检测鼠标悬停的对象
+    :param game: 游戏实例
+    :param mouse_x: 鼠标X坐标
+    :param mouse_y: 鼠标Y坐标
+    :return: (object_type, object) 元组，object_type可以是 'card', 'cell', 'monster', None
+    """
+    # 检查是否悬停在手牌上
+    hand_y = HAND_AREA_Y
+    hand_x_start = HAND_AREA_X
+    
+    for i, card in enumerate(game.hand):
+        card_x = hand_x_start + i * (CARD_WIDTH + CARD_MARGIN)
+        card_rect = pygame.Rect(card_x, hand_y, CARD_WIDTH, CARD_HEIGHT)
+        if card_rect.collidepoint(mouse_x, mouse_y):
+            return ('card', card)
+    
+    # 检查是否悬停在地图格子上
+    col = int((mouse_x - MAP_START_X - CELL_MARGIN) // (CELL_SIZE + CELL_MARGIN))
+    row = int((mouse_y - MAP_START_Y - CELL_MARGIN) // (CELL_SIZE + CELL_MARGIN))
+    
+    if 0 <= row < MAP_HEIGHT and 0 <= col < MAP_WIDTH:
+        cell = game.get_cell(row, col)
+        if cell:
+            if isinstance(cell, MonsterCell):
+                return ('monster', cell)
+            else:
+                return ('cell', cell)
+    
+    return (None, None)
+
+
+def get_hover_info(game, hovered_type, hovered_object):
+    """
+    获取悬停对象的详细信息
+    :param game: 游戏实例
+    :param hovered_type: 悬停对象类型
+    :param hovered_object: 悬停对象
+    :return: 详细信息文本列表
+    """
+    if hovered_type == 'card' and hovered_object:
+        info = []
+        info.append(f"卡牌: {hovered_object.name}")
+        info.append(f"类型: {hovered_object.unit_type}")
+        info.append(f"战力: {hovered_object.power}")
+        return info
+    elif hovered_type == 'cell' and hovered_object:
+        row, col = hovered_object.row, hovered_object.col
+        return game.get_cell_info(row, col)
+    elif hovered_type == 'monster' and hovered_object:
+        return game.get_monster_info(hovered_object)
+    else:
+        return ["悬停查看详细信息"]
+
+
+def draw_ui(screen, game, mouse_pos):
+    """绘制右侧悬停对象信息UI"""
     ui_x = UI_PANEL_X
     
     # 绘制UI背景
     ui_rect = pygame.Rect(UI_PANEL_X, UI_PANEL_Y, UI_PANEL_WIDTH, UI_PANEL_HEIGHT)
     pygame.draw.rect(screen, COLOR_UI_BG, ui_rect)
     
-    # 绘制游戏状态（字体大小根据UI面板大小动态调整）
+    # 检测悬停对象
+    mouse_x, mouse_y = mouse_pos
+    hovered_type, hovered_object = get_hovered_object(game, mouse_x, mouse_y)
+    
+    # 获取悬停对象信息
+    info_texts = get_hover_info(game, hovered_type, hovered_object)
+    
+    # 绘制信息（字体大小根据UI面板大小动态调整）
     ui_scale = UI_PANEL_WIDTH / 200.0
     font_size = max(16, int(24 * ui_scale))
     line_spacing = max(22, int(28 * ui_scale))
     
     font = get_chinese_font(font_size)
-    state_texts = game.get_game_state_text()
     
     y_offset = UI_PANEL_Y + max(15, int(20 * ui_scale))
-    for text in state_texts:
+    for text in info_texts:
         # 根据文本内容选择颜色
-        if "战力优势" in text or "游戏胜利" in text:
+        if "战力优势" in text or "玩家胜利" in text:
             color = (100, 255, 100)  # 绿色
-        elif "战力不足" in text or "游戏失败" in text:
+        elif "战力不足" in text or "怪物胜利" in text:
             color = (255, 100, 100)  # 红色
         elif "怪物战力" in text:
             color = (255, 150, 150)  # 浅红色
-        elif "玩家战力" in text:
+        elif "玩家战力" in text or "周围玩家战力" in text:
             color = (150, 255, 150)  # 浅绿色
-        elif "倒计时回合" in text or "回合数" in text:
-            color = (255, 200, 100)  # 橙色
+        elif "已部署" in text:
+            color = (100, 255, 200)  # 青色
+        elif "未部署" in text or "未触发" in text:
+            color = (200, 200, 200)  # 灰色
         else:
             color = COLOR_UI_TEXT  # 默认白色
         
@@ -418,6 +508,9 @@ def main():
         # 绘制
         screen.fill(COLOR_BACKGROUND)
         
+        # 绘制顶部血条
+        draw_health_bar(screen, game)
+        
         # 绘制地图
         for row in range(MAP_HEIGHT):
             for col in range(MAP_WIDTH):
@@ -458,8 +551,8 @@ def main():
         # 绘制左侧操作说明面板
         draw_left_panel(screen)
         
-        # 绘制右侧游戏状态UI
-        draw_ui(screen, game)
+        # 绘制右侧悬停对象信息UI
+        draw_ui(screen, game, mouse_pos)
         
         # 绘制结束回合按钮（在右侧面板底部）
         draw_end_turn_button(screen, mouse_pos)

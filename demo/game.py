@@ -3,6 +3,7 @@
 游戏核心逻辑
 """
 import random
+import math
 from cell import Cell, NumberCell, MonsterCell, CellState
 from unit import Unit
 from card import Card
@@ -241,13 +242,13 @@ class Game:
         
         # 如果格子未揭示，揭示它
         if not cell.is_revealed():
-            # 如果是怪物格子，触发战斗
+            # 如果是怪物格子，触发怪物（待机状态，不进行战斗）
             if isinstance(cell, MonsterCell):
                 cell.trigger()
-                # 计算怪物战力：基础战力 + (相邻数字和 / 除数)，向下取整
-                adjacent_numbers = self._get_adjacent_numbers(row, col)
-                monster_power = int(MONSTER_BASE_POWER + (sum(adjacent_numbers) / MONSTER_POWER_DIVISOR))
+                # 使用正态分布生成怪物战力（1-32）
+                monster_power = self._weighted_random_monster_power()
                 cell.set_monster_power(monster_power)
+                # 不进行战斗结算，怪物处于待机状态
             else:
                 # 数字格子，实现空白区域自动展开（只有数字为0时才展开）
                 if isinstance(cell, NumberCell) and cell.number == 0:
@@ -257,6 +258,12 @@ class Game:
                     # 数字>0，只揭示当前格子
                     cell.reveal()
             
+            return True
+        
+        # 如果格子已揭示，检查是否是已触发的怪物（待机状态）
+        if isinstance(cell, MonsterCell) and cell.triggered and cell.battle_won is None:
+            # 再次点击已触发的怪物，进行战斗结算
+            self._battle_settlement(cell)
             return True
         
         return False
@@ -320,9 +327,6 @@ class Game:
         if self.game_over:
             return False
         
-        # 消耗所有激活怪物的倒计时回合
-        self._consume_all_active_monsters_countdown()
-        
         # 丢弃手上现有卡牌
         self.hand.clear()
         
@@ -375,6 +379,33 @@ class Game:
         
         # 从加权列表中随机选择
         return random.choice(weighted_list)
+    
+    def _weighted_random_monster_power(self):
+        """
+        使用正态分布生成怪物战力（1-32）
+        均值约16，标准差约8，使得中间值概率高，两端概率低
+        数值越高权重越小（通过正态分布自然实现）
+        返回: 1-32 的怪物战力值
+        """
+        mean = 16.0  # 均值，接近中间值
+        std_dev = 8.0  # 标准差
+        
+        # 使用正态分布生成值，如果超出范围则重新采样
+        max_attempts = 100
+        for _ in range(max_attempts):
+            # 使用Box-Muller变换生成正态分布随机数
+            u1 = random.random()
+            u2 = random.random()
+            z = math.sqrt(-2.0 * math.log(u1)) * math.cos(2.0 * math.pi * u2)
+            value = mean + std_dev * z
+            
+            # 截断到1-32范围
+            power = int(round(value))
+            if 1 <= power <= 32:
+                return power
+        
+        # 如果多次尝试都失败，返回中间值
+        return 16
     
     def update(self):
         """
@@ -442,23 +473,6 @@ class Game:
             return self.grid[row][col]
         return None
     
-    def _consume_all_active_monsters_countdown(self):
-        """消耗所有激活怪物的倒计时回合"""
-        monsters_to_settle = []
-        for monster in self.monsters:
-            if monster.is_countdown_active():
-                monster.consume_countdown_round()
-                # 检查倒计时是否结束
-                if not monster.is_countdown_active():
-                    monsters_to_settle.append(monster)
-        
-        # 结算所有倒计时结束的怪物
-        for monster in monsters_to_settle:
-            self._battle_settlement(monster)
-    
-    def get_active_monsters(self):
-        """获取所有激活的怪物（倒计时中的）"""
-        return [m for m in self.monsters if m.is_countdown_active()]
     
     def _check_all_monsters_settled(self):
         """检查所有怪物是否都已结算（battle_won不为None）"""
@@ -478,35 +492,110 @@ class Game:
             player_power += cell.get_power()
         return int(player_power)
     
+    def get_cell_info(self, row, col):
+        """
+        获取格子的详细信息
+        只有已揭示的格子才显示详细信息，未揭示的格子不显示具体信息（防止作弊）
+        :param row: 行
+        :param col: 列
+        :return: 详细信息文本列表
+        """
+        if not (0 <= row < self.height and 0 <= col < self.width):
+            return []
+        
+        cell = self.grid[row][col]
+        if not cell:
+            return []
+        
+        info = []
+        
+        # 如果格子未揭示，只显示基本信息，不显示具体内容
+        if not cell.is_revealed():
+            info.append(f"未揭示格子 ({row}, {col})")
+            return info
+        
+        # 已揭示的格子显示详细信息
+        if isinstance(cell, NumberCell):
+            info.append(f"数字格子 ({row}, {col})")
+            info.append(f"数字: {cell.number}")
+            if cell.has_unit():
+                info.append(f"已部署: {cell.unit.name}")
+                info.append(f"战力: {cell.unit.power}")
+            else:
+                info.append("未部署兵种")
+        elif isinstance(cell, MonsterCell):
+            info.append(f"怪物格子 ({row}, {col})")
+            if cell.triggered:
+                info.append(f"怪物战力: {int(cell.monster_power)}")
+                player_power = self.get_player_power_around_monster(cell)
+                info.append(f"周围玩家战力: {player_power}")
+                power_diff = player_power - int(cell.monster_power)
+                if power_diff >= 0:
+                    info.append(f"战力优势: +{power_diff}")
+                else:
+                    info.append(f"战力不足: {power_diff}")
+                if cell.battle_won is not None:
+                    if cell.battle_won:
+                        info.append("战斗结果: 玩家胜利")
+                    else:
+                        info.append("战斗结果: 怪物胜利")
+            else:
+                info.append("未触发")
+        else:
+            info.append(f"未知格子 ({row}, {col})")
+        
+        return info
+    
+    def get_monster_info(self, monster_cell):
+        """
+        获取怪物的详细信息
+        只有已揭示的怪物才显示详细信息，未揭示的怪物不显示具体信息（防止作弊）
+        :param monster_cell: 怪物格子
+        :return: 详细信息文本列表
+        """
+        if not isinstance(monster_cell, MonsterCell):
+            return []
+        
+        info = []
+        
+        # 如果怪物未揭示，只显示基本信息，不显示具体内容
+        if not monster_cell.is_revealed():
+            info.append(f"未揭示格子 ({monster_cell.row}, {monster_cell.col})")
+            return info
+        
+        # 已揭示的怪物显示详细信息
+        info.append(f"怪物 ({monster_cell.row}, {monster_cell.col})")
+        
+        if monster_cell.triggered:
+            info.append(f"怪物战力: {int(monster_cell.monster_power)}")
+            player_power = self.get_player_power_around_monster(monster_cell)
+            info.append(f"周围玩家战力: {player_power}")
+            power_diff = player_power - int(monster_cell.monster_power)
+            if power_diff >= 0:
+                info.append(f"战力优势: +{power_diff}")
+            else:
+                info.append(f"战力不足: {power_diff}")
+            if monster_cell.battle_won is not None:
+                if monster_cell.battle_won:
+                    info.append("战斗结果: 玩家胜利")
+                else:
+                    info.append("战斗结果: 怪物胜利")
+        else:
+            info.append("未触发")
+        
+        return info
+    
     def get_game_state_text(self):
         """获取游戏状态文本"""
         state = []
         state.append(f"生命值: {self.health}")
         state.append(f"回合数: {self.current_turn}")
         state.append(f"手牌数: {len(self.hand)}")
-        active_monsters = self.get_active_monsters()
-        state.append(f"激活怪物: {len(active_monsters)}")
         # 剩余怪物 = 所有未结算的怪物（battle_won为None）
         remaining_monsters = sum(1 for row in range(self.height) for col in range(self.width) 
                                 if isinstance(self.grid[row][col], MonsterCell) 
                                 and self.grid[row][col].battle_won is None)
         state.append(f"剩余怪物: {remaining_monsters}")
-        
-        # 显示所有激活怪物的信息
-        if active_monsters:
-            state.append("")
-            for i, monster in enumerate(active_monsters[:3]):  # 最多显示3个
-                remaining = monster.get_countdown_remaining()
-                state.append(f"怪物{i+1} 回合: {remaining}")
-                monster_power = int(monster.monster_power)
-                player_power = self.get_player_power_around_monster(monster)
-                power_diff = int(player_power - monster_power)
-                if power_diff >= 0:
-                    state.append(f"  优势: +{power_diff}")
-                else:
-                    state.append(f"  不足: {power_diff}")
-            if len(active_monsters) > 3:
-                state.append(f"...还有{len(active_monsters)-3}个")
         
         if self.game_over:
             state.append("")
