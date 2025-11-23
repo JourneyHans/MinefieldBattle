@@ -29,6 +29,7 @@ class Game:
         self.game_won = False
         self.monsters = []  # 所有怪物列表
         self.reveal_animation_queue = []  # 揭示动画队列 [(row, col, reveal_time), ...]
+        self.unity_animation_queue = []  # 团结一致动画队列 [(row, col, start_time), ...]
         
         # 回合系统
         self.current_turn = 1  # 当前回合数
@@ -316,6 +317,9 @@ class Game:
         # 从手牌移除卡牌
         self.hand.remove(card)
         
+        # 检查并应用团结一致效果
+        self._check_and_apply_unity_effect(row, col)
+        
         return True
     
     def end_turn(self):
@@ -429,6 +433,15 @@ class Game:
                 new_queue.append((row, col, reveal_time))
         self.reveal_animation_queue = new_queue
         
+        # 处理团结一致动画（0.5秒后自动清除）
+        unity_animation_duration = 0.5
+        new_unity_queue = []
+        for row, col, start_time in self.unity_animation_queue:
+            if current_time < start_time + unity_animation_duration:
+                # 动画还在进行中，保留
+                new_unity_queue.append((row, col, start_time))
+        self.unity_animation_queue = new_unity_queue
+        
         # 检查胜利条件：玩家生命值没有降到0，且所有怪物都被结算了
         if self.health > 0 and not self.game_over:
             # 检查所有怪物是否都已结算（battle_won不为None）
@@ -520,7 +533,13 @@ class Game:
             info.append(f"数字: {cell.number}")
             if cell.has_unit():
                 info.append(f"已部署: {cell.unit.name}")
-                info.append(f"战力: {cell.unit.power}")
+                # 显示实际战力（考虑团结一致效果）
+                actual_power = cell.unit.get_effective_power()
+                if cell.unit.unity_bonus_count > 0:
+                    mark = "*" * cell.unit.unity_bonus_count
+                    info.append(f"战力: {actual_power}{mark}")
+                else:
+                    info.append(f"战力: {actual_power}")
             else:
                 info.append("未部署兵种")
         elif isinstance(cell, MonsterCell):
@@ -605,4 +624,119 @@ class Game:
                 state.append("游戏失败！")
         
         return state
+    
+    def _check_unity_effect(self, row, col):
+        """
+        检查指定位置所在的行和列是否有3个或以上战士
+        :param row: 行
+        :param col: 列
+        :return: (row_warriors, col_warriors) 元组，每个是符合条件的战士位置列表
+        """
+        row_warriors = []
+        col_warriors = []
+        
+        # 检查行
+        for c in range(self.width):
+            cell = self.grid[row][c]
+            if (isinstance(cell, NumberCell) and cell.has_unit() and 
+                cell.unit.unit_type == 1):  # 战士类型为1
+                row_warriors.append((row, c))
+        
+        # 检查列
+        for r in range(self.height):
+            cell = self.grid[r][col]
+            if (isinstance(cell, NumberCell) and cell.has_unit() and 
+                cell.unit.unit_type == 1):  # 战士类型为1
+                col_warriors.append((r, col))
+        
+        return row_warriors, col_warriors
+    
+    def _apply_unity_effect(self, warriors):
+        """
+        为符合条件的战士应用战力翻倍效果（可以叠加）
+        :param warriors: 战士位置列表 [(row, col), ...]
+        :return: (应用效果的战士位置列表, 新获得效果的战士位置列表) 用于动画
+        """
+        applied_warriors = []
+        newly_triggered = []  # 新获得效果的战士（用于动画）
+        
+        for row, col in warriors:
+            cell = self.grid[row][col]
+            if (isinstance(cell, NumberCell) and cell.has_unit() and 
+                cell.unit.unit_type == 1):
+                # 记录应用效果前的状态
+                old_count = cell.unit.unity_bonus_count
+                # 应用效果（叠加，最多2次）
+                if cell.unit.unity_bonus_count < 2:
+                    cell.unit.unity_bonus_count += 1
+                    applied_warriors.append((row, col))
+                    # 如果是新获得效果（从0到1，或从1到2），记录用于动画
+                    if old_count == 0:
+                        newly_triggered.append((row, col))
+        
+        return applied_warriors, newly_triggered
+    
+    def _check_and_apply_unity_effect(self, row, col):
+        """
+        检查并应用团结一致效果
+        重新计算所有行和列，确保效果正确应用
+        :param row: 行（新部署的位置，用于触发检查）
+        :param col: 列（新部署的位置，用于触发检查）
+        """
+        # 先清除所有战士的团结一致效果（重新计算）
+        self._clear_all_unity_effects()
+        
+        import time
+        current_time = time.time()
+        newly_triggered_set = set()  # 用于避免重复添加动画
+        all_newly_triggered = []  # 收集所有新获得效果的战士位置（用于动画）
+        
+        # 检查所有行
+        for r in range(self.height):
+            row_warriors = []
+            for c in range(self.width):
+                cell = self.grid[r][c]
+                if (isinstance(cell, NumberCell) and cell.has_unit() and 
+                    cell.unit.unit_type == 1):  # 战士类型为1
+                    row_warriors.append((r, c))
+            
+            # 如果行有3个或以上战士，应用效果
+            if len(row_warriors) >= 3:
+                applied, newly_triggered = self._apply_unity_effect(row_warriors)
+                for pos in newly_triggered:
+                    if pos not in newly_triggered_set:
+                        newly_triggered_set.add(pos)
+                        all_newly_triggered.append(pos)
+        
+        # 检查所有列
+        for c in range(self.width):
+            col_warriors = []
+            for r in range(self.height):
+                cell = self.grid[r][c]
+                if (isinstance(cell, NumberCell) and cell.has_unit() and 
+                    cell.unit.unit_type == 1):  # 战士类型为1
+                    col_warriors.append((r, c))
+            
+            # 如果列有3个或以上战士，应用效果
+            if len(col_warriors) >= 3:
+                applied, newly_triggered = self._apply_unity_effect(col_warriors)
+                for pos in newly_triggered:
+                    if pos not in newly_triggered_set:
+                        newly_triggered_set.add(pos)
+                        all_newly_triggered.append(pos)
+        
+        # 只对新获得效果的战士播放动画，依次播放，每个动画间隔0.1秒
+        if all_newly_triggered:
+            animation_delay = 0.1
+            for i, pos in enumerate(all_newly_triggered):
+                start_time = current_time + i * animation_delay
+                self.unity_animation_queue.append((pos[0], pos[1], start_time))
+    
+    def _clear_all_unity_effects(self):
+        """清除所有战士的团结一致效果"""
+        for row in range(self.height):
+            for col in range(self.width):
+                cell = self.grid[row][col]
+                if isinstance(cell, NumberCell) and cell.has_unit():
+                    cell.unit.unity_bonus_count = 0
 

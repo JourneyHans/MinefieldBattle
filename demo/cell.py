@@ -40,9 +40,9 @@ class Cell:
         return self.unit is not None
     
     def get_power(self):
-        """获取战力（用于战斗计算）"""
+        """获取战力（用于战斗计算，考虑团结一致效果）"""
         if self.has_unit():
-            return self.unit.power
+            return self.unit.get_effective_power()
         return 0
 
 
@@ -61,7 +61,14 @@ class NumberCell(Cell):
         if self.state == CellState.HIDDEN:
             return ""
         elif self.state == CellState.DEPLOYED and self.unit:
-            return f"{self.number}\n{self.unit.name}"
+            # 显示实际战力（考虑团结一致效果）
+            actual_power = self.unit.get_effective_power()
+            if self.unit.unity_bonus_count > 0:
+                # 如果有团结一致效果，显示特殊标记
+                mark = "*" * self.unit.unity_bonus_count  # 1次效果显示*，2次显示**
+                return f"{self.number}\n{self.unit.name}\n战力:{actual_power}{mark}"
+            else:
+                return f"{self.number}\n{self.unit.name}\n战力:{actual_power}"
         else:
             # 数字为0时不显示
             if self.number == 0:

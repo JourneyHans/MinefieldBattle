@@ -28,6 +28,53 @@ def get_chinese_font(size):
     return pygame.font.Font(None, size)
 
 
+def draw_unity_animation(screen, game):
+    """绘制团结一致动画效果（扫光效果）"""
+    import time
+    current_time = time.time()
+    animation_duration = 0.5  # 动画持续时间0.5秒
+    
+    for row, col, start_time in game.unity_animation_queue:
+        # 计算动画进度（0.0到1.0）
+        elapsed = current_time - start_time
+        if elapsed >= animation_duration:
+            continue  # 动画已结束
+        
+        progress = elapsed / animation_duration  # 0.0 到 1.0
+        
+        # 计算格子位置
+        x = MAP_START_X + CELL_MARGIN + col * (CELL_SIZE + CELL_MARGIN)
+        y = MAP_START_Y + CELL_MARGIN + row * (CELL_SIZE + CELL_MARGIN)
+        
+        # 创建扫光效果：从左到右的渐变高光
+        # 扫光宽度为格子宽度的30%
+        sweep_width = int(CELL_SIZE * 0.3)
+        sweep_x = int(x + progress * (CELL_SIZE + sweep_width) - sweep_width)
+        
+        # 创建半透明表面用于扫光
+        sweep_surface = pygame.Surface((sweep_width, CELL_SIZE), pygame.SRCALPHA)
+        
+        # 绘制渐变扫光（从透明到半透明白色，再到透明）
+        for i in range(sweep_width):
+            # 计算当前位置的alpha值（中间最亮，两边透明）
+            alpha = int(255 * (1.0 - abs(i - sweep_width // 2) / (sweep_width // 2)))
+            alpha = max(0, min(255, alpha))
+            # 使用金色/黄色扫光效果
+            color = (255, 215, 0, alpha)  # 金色，带透明度
+            pygame.draw.line(sweep_surface, color, (i, 0), (i, CELL_SIZE))
+        
+        # 只在格子范围内绘制
+        if sweep_x + sweep_width >= x and sweep_x <= x + CELL_SIZE:
+            # 计算实际绘制区域
+            draw_x = max(x, sweep_x)
+            draw_width = min(x + CELL_SIZE, sweep_x + sweep_width) - draw_x
+            if draw_width > 0:
+                # 裁剪表面到实际绘制区域
+                clip_x = draw_x - sweep_x
+                clipped_surface = sweep_surface.subsurface((clip_x, 0, draw_width, CELL_SIZE))
+                screen.blit(clipped_surface, (draw_x, y))
+
+
 def draw_cell(screen, cell, x, y, game=None):
     """绘制单个格子"""
     rect = pygame.Rect(x, y, CELL_SIZE, CELL_SIZE)
@@ -537,6 +584,9 @@ def main():
                         highlight_surface = pygame.Surface((CELL_SIZE, CELL_SIZE), pygame.SRCALPHA)
                         highlight_surface.fill((100, 255, 100, 100))  # 半透明绿色
                         screen.blit(highlight_surface, highlight_rect)
+        
+        # 绘制团结一致动画效果
+        draw_unity_animation(screen, game)
         
         # 绘制手牌
         draw_hand(screen, game, dragging_card)
