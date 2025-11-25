@@ -81,6 +81,8 @@ class Game:
         self.main_task_type = None  # 当前通关任务类型
         
         self._generate_map()
+        # 游戏开始时自动揭示一片空白区域，避免首次点击点到怪物或任务
+        self._reveal_initial_blank_area()
         # 游戏开始时发牌
         self._deal_cards()
     
@@ -130,6 +132,35 @@ class Game:
                     count = self._count_adjacent_monsters(row, col)
                     # 创建数字格子（如果没有相邻怪物，数字为0，但显示为空白）
                     self.grid[row][col] = NumberCell(row, col, count)
+    
+    def _reveal_initial_blank_area(self):
+        """
+        游戏开始时自动揭示一片空白区域
+        避免玩家首次点击时点到怪物或通关任务
+        """
+        # 收集所有数字为0的空白格子
+        blank_cells = []
+        for row in range(self.height):
+            for col in range(self.width):
+                cell = self.grid[row][col]
+                if isinstance(cell, NumberCell) and cell.number == 0:
+                    blank_cells.append((row, col))
+        
+        # 如果没有空白格子，则不揭示（理论上不应该发生）
+        if not blank_cells:
+            return
+        
+        # 随机选择一个空白格子作为起始点
+        start_row, start_col = random.choice(blank_cells)
+        
+        # 揭示这片空白区域（不使用动画，直接揭示）
+        cells_to_reveal = self._collect_blank_area(start_row, start_col)
+        
+        # 直接揭示所有收集到的格子（不使用动画队列）
+        for row, col, _ in cells_to_reveal:
+            cell = self.grid[row][col]
+            if not cell.is_revealed():
+                cell.reveal()
     
     def _count_adjacent_monsters(self, row, col):
         """计算相邻8个格子中的怪物数量"""
