@@ -81,7 +81,12 @@ CARD_HEIGHT = ui_config.CARD_HEIGHT  # 从ui_config导入（会被calculate_layo
 CARD_MARGIN = ui_config.CARD_MARGIN  # 从ui_config导入（会被calculate_layout更新）
 CARDS_PER_TURN = card_config.CARDS_PER_TURN
 MAX_HAND_SIZE = card_config.MAX_HAND_SIZE
-UNIT_NAMES = card_config.UNIT_NAMES
+UNIT_NAMES = card_config.UNIT_NAMES  # 保留用于向后兼容（已废弃）
+
+# 兵种类型配置
+UnitCategory = card_config.UnitCategory
+BASE_UNITS = card_config.BASE_UNITS
+CARD_DEAL_WEIGHTS = card_config.CARD_DEAL_WEIGHTS
 
 # 任务配置
 TaskType = task_config.TaskType

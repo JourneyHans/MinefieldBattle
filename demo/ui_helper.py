@@ -51,10 +51,20 @@ def get_hover_info(game, hovered_type, hovered_object):
     :return: 详细信息文本列表
     """
     if hovered_type == 'card' and hovered_object:
+        from config.card_config import UnitCategory
+        
+        category_names = {
+            UnitCategory.STRENGTH: "力量",
+            UnitCategory.AGILITY: "敏捷",
+            UnitCategory.WISDOM: "智慧"
+        }
+        
         info = []
         info.append(f"卡牌: {hovered_object.name}")
-        info.append(f"类型: {hovered_object.unit_type}")
+        category_name = category_names.get(hovered_object.category, "未知")
+        info.append(f"类型: {category_name}")
         info.append(f"战力: {hovered_object.power}")
+        info.append(f"生命: {hovered_object.health}")
         return info
     elif hovered_type == 'cell' and hovered_object:
         row, col = hovered_object.row, hovered_object.col

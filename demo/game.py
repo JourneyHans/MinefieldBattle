@@ -382,8 +382,8 @@ class Game:
         """
         部署卡牌到指定格子
         规则：
-        - 可以将高数值卡牌放到低数值区域，但战力会降低到区域数值
-        - 不能将低数值卡牌放到高数值区域
+        - 任意兵种卡牌可以部署到任意已揭示的数字格子（数字>0）
+        - 兵种战力使用卡牌自身的power值（固定为1）
         :param card: 要部署的卡牌
         :param row: 行
         :param col: 列
@@ -408,19 +408,12 @@ class Game:
         if cell.number == 0:
             return False
         
-        # 规则：卡牌数值必须 >= 格子数值（允许高数值卡牌放到低数值区域）
-        if card.unit_type < cell.number:
-            return False  # 低数值卡牌不能放到高数值区域
-        
         # 格子不能已有兵种
         if cell.has_unit():
             return False
         
-        # 部署兵种
-        # 如果卡牌数值 > 格子数值，战力会降低到格子数值
-        # 如果卡牌数值 == 格子数值，战力保持原值
-        actual_power = cell.number  # 实际战力 = 格子数值
-        unit = card.create_unit_with_power(actual_power)
+        # 部署兵种（使用卡牌自身的power值，固定为1）
+        unit = card.create_unit()  # 使用卡牌原始战力
         cell.deploy_unit(unit)
         
         # 从手牌移除卡牌
@@ -452,7 +445,9 @@ class Game:
         return True
     
     def _deal_cards(self):
-        """发牌（每回合发3张随机卡牌，低数值卡牌概率更高）"""
+        """发牌（每回合发5张随机卡牌，使用加权随机从三种基础兵种中选择）"""
+        from config.card_config import CARD_DEAL_WEIGHTS
+        
         # 如果手牌已满，不再发牌
         if len(self.hand) >= MAX_HAND_SIZE:
             return
@@ -462,33 +457,23 @@ class Game:
         
         # 发牌
         for _ in range(cards_to_deal):
-            # 使用加权随机生成1-8的兵种类型
-            # 低数值（1-4）概率高，高数值（5-8）概率低
-            unit_type = self._weighted_random_unit_type()
-            card = Card(unit_type)
+            # 使用加权随机从三种基础兵种中选择
+            unit_name = self._weighted_random_card_category()
+            card = Card(unit_name)
             self.hand.append(card)
     
-    def _weighted_random_unit_type(self):
+    def _weighted_random_card_category(self):
         """
-        加权随机生成兵种类型
-        低数值卡牌（1-4）有更高概率，避免卡手
-        返回: 1-8 的兵种类型
+        加权随机生成兵种卡牌
+        使用配置的权重从三种基础兵种中选择
+        返回: 兵种名称（士兵/游侠/法师）
         """
-        # 定义权重：低数值权重高，高数值权重低
-        # 1-4: 每个权重 5 (总共20)
-        # 5-6: 每个权重 3 (总共6)
-        # 7-8: 每个权重 2 (总共4)
-        # 总权重: 30
-        weights = {
-            1: 5, 2: 5, 3: 5, 4: 5,  # 低数值，高权重
-            5: 3, 6: 3,              # 中数值，中权重（提升）
-            7: 2, 8: 2               # 高数值，低权重（提升）
-        }
+        from config.card_config import CARD_DEAL_WEIGHTS
         
         # 构建加权列表
         weighted_list = []
-        for unit_type, weight in weights.items():
-            weighted_list.extend([unit_type] * weight)
+        for unit_name, weight in CARD_DEAL_WEIGHTS.items():
+            weighted_list.extend([unit_name] * weight)
         
         # 从加权列表中随机选择
         return random.choice(weighted_list)
@@ -667,6 +652,7 @@ class Game:
                     info.append(f"战力: {actual_power}{mark}")
                 else:
                     info.append(f"战力: {actual_power}")
+                info.append(f"生命: {cell.unit.health}")
             else:
                 info.append("未部署兵种")
         elif isinstance(cell, MonsterCell):
@@ -813,11 +799,13 @@ class Game:
     
     def _check_unity_effect(self, row, col):
         """
-        检查指定位置所在的行和列是否有3个或以上战士
+        检查指定位置所在的行和列是否有3个或以上士兵
         :param row: 行
         :param col: 列
-        :return: (row_warriors, col_warriors) 元组，每个是符合条件的战士位置列表
+        :return: (row_warriors, col_warriors) 元组，每个是符合条件的士兵位置列表
         """
+        from config.card_config import UnitCategory
+        
         row_warriors = []
         col_warriors = []
         
@@ -825,31 +813,36 @@ class Game:
         for c in range(self.width):
             cell = self.grid[row][c]
             if (isinstance(cell, NumberCell) and cell.has_unit() and 
-                cell.unit.unit_type == 1):  # 战士类型为1
+                cell.unit.category == UnitCategory.STRENGTH and 
+                cell.unit.unit_name == "士兵"):
                 row_warriors.append((row, c))
         
         # 检查列
         for r in range(self.height):
             cell = self.grid[r][col]
             if (isinstance(cell, NumberCell) and cell.has_unit() and 
-                cell.unit.unit_type == 1):  # 战士类型为1
+                cell.unit.category == UnitCategory.STRENGTH and 
+                cell.unit.unit_name == "士兵"):
                 col_warriors.append((r, col))
         
         return row_warriors, col_warriors
     
     def _apply_unity_effect(self, warriors):
         """
-        为符合条件的战士应用战力翻倍效果（可以叠加）
-        :param warriors: 战士位置列表 [(row, col), ...]
-        :return: (应用效果的战士位置列表, 新获得效果的战士位置列表) 用于动画
+        为符合条件的士兵应用战力翻倍效果（可以叠加）
+        :param warriors: 士兵位置列表 [(row, col), ...]
+        :return: (应用效果的士兵位置列表, 新获得效果的士兵位置列表) 用于动画
         """
+        from config.card_config import UnitCategory
+        
         applied_warriors = []
-        newly_triggered = []  # 新获得效果的战士（用于动画）
+        newly_triggered = []  # 新获得效果的士兵（用于动画）
         
         for row, col in warriors:
             cell = self.grid[row][col]
             if (isinstance(cell, NumberCell) and cell.has_unit() and 
-                cell.unit.unit_type == 1):
+                cell.unit.category == UnitCategory.STRENGTH and 
+                cell.unit.unit_name == "士兵"):
                 # 记录应用效果前的状态
                 old_count = cell.unit.unity_bonus_count
                 # 应用效果（叠加，最多2次）
@@ -877,16 +870,19 @@ class Game:
         newly_triggered_set = set()  # 用于避免重复添加动画
         all_newly_triggered = []  # 收集所有新获得效果的战士位置（用于动画）
         
+        from config.card_config import UnitCategory
+        
         # 检查所有行
         for r in range(self.height):
             row_warriors = []
             for c in range(self.width):
                 cell = self.grid[r][c]
                 if (isinstance(cell, NumberCell) and cell.has_unit() and 
-                    cell.unit.unit_type == 1):  # 战士类型为1
+                    cell.unit.category == UnitCategory.STRENGTH and 
+                    cell.unit.unit_name == "士兵"):
                     row_warriors.append((r, c))
             
-            # 如果行有3个或以上战士，应用效果
+            # 如果行有3个或以上士兵，应用效果
             if len(row_warriors) >= 3:
                 applied, newly_triggered = self._apply_unity_effect(row_warriors)
                 for pos in newly_triggered:
@@ -900,10 +896,11 @@ class Game:
             for r in range(self.height):
                 cell = self.grid[r][c]
                 if (isinstance(cell, NumberCell) and cell.has_unit() and 
-                    cell.unit.unit_type == 1):  # 战士类型为1
+                    cell.unit.category == UnitCategory.STRENGTH and 
+                    cell.unit.unit_name == "士兵"):
                     col_warriors.append((r, c))
             
-            # 如果列有3个或以上战士，应用效果
+            # 如果列有3个或以上士兵，应用效果
             if len(col_warriors) >= 3:
                 applied, newly_triggered = self._apply_unity_effect(col_warriors)
                 for pos in newly_triggered:

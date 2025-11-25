@@ -83,7 +83,6 @@ def main():
                                 cell.is_revealed() and 
                                 isinstance(cell, NumberCell) and 
                             cell.number > 0 and  # 不能部署到数字为0的格子
-                            cell.number <= dragging_card.unit_type and  # 卡牌数值 >= 格子数值
                                 not cell.has_unit())
                     
                     draw_cell(screen, cell, x, y, game)

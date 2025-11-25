@@ -166,46 +166,64 @@ def draw_unity_animation(screen, game):
 
 def draw_card(screen, card, x, y, selected=False):
     """绘制一张卡牌"""
-    # 卡牌背景
+    from config.card_config import UnitCategory
+    
+    # 卡牌背景（使用卡牌类型对应的颜色）
     card_rect = pygame.Rect(x, y, CARD_WIDTH, CARD_HEIGHT)
     if selected:
-        # 选中的卡牌用更亮的颜色
-        color = (200, 200, 255)
+        # 选中的卡牌用更亮的颜色（在原有颜色基础上加亮）
+        base_color = card.card_color
+        color = tuple(min(255, c + 30) for c in base_color)
     else:
-        color = (180, 180, 220)
+        color = card.card_color
     pygame.draw.rect(screen, color, card_rect)
     pygame.draw.rect(screen, COLOR_TEXT, card_rect, 2)  # 边框
     
     # 绘制卡牌内容（字体大小根据卡牌大小动态调整）
-    # 原始比例：CARD_WIDTH=80时，name_font=18, power_font=24, type_font=32
+    # 原始比例：CARD_WIDTH=80时，name_font=18, power_font=20, category_font=16, health_font=16
     card_scale = CARD_WIDTH / 80.0
     name_font_size = max(10, int(18 * card_scale))
-    power_font_size = max(12, int(24 * card_scale))
-    type_font_size = max(16, int(32 * card_scale))
+    power_font_size = max(12, int(20 * card_scale))
+    category_font_size = max(12, int(16 * card_scale))
+    health_font_size = max(12, int(16 * card_scale))
     
     # 兵种名称
     name_font = get_chinese_font(name_font_size)
     name_text = name_font.render(card.name, True, COLOR_TEXT)
     name_rect = name_text.get_rect()
     name_rect.centerx = x + CARD_WIDTH // 2
-    name_rect.centery = y + int(CARD_HEIGHT * 0.25)
+    name_rect.centery = y + int(CARD_HEIGHT * 0.2)
     screen.blit(name_text, name_rect)
+    
+    # 兵种类型（力量/敏捷/智慧）
+    category_names = {
+        UnitCategory.STRENGTH: "力量",
+        UnitCategory.AGILITY: "敏捷",
+        UnitCategory.WISDOM: "智慧"
+    }
+    category_font = get_chinese_font(category_font_size)
+    category_name = category_names.get(card.category, "未知")
+    category_text = category_font.render(category_name, True, COLOR_TEXT)
+    category_rect = category_text.get_rect()
+    category_rect.centerx = x + CARD_WIDTH // 2
+    category_rect.centery = y + int(CARD_HEIGHT * 0.4)
+    screen.blit(category_text, category_rect)
     
     # 战力值
     power_font = get_chinese_font(power_font_size)
     power_text = power_font.render(f"战力: {card.power}", True, COLOR_TEXT)
     power_rect = power_text.get_rect()
     power_rect.centerx = x + CARD_WIDTH // 2
-    power_rect.centery = y + CARD_HEIGHT - int(CARD_HEIGHT * 0.25)
+    power_rect.centery = y + int(CARD_HEIGHT * 0.7)
     screen.blit(power_text, power_rect)
     
-    # 兵种类型（数字）
-    type_font = get_chinese_font(type_font_size)
-    type_text = type_font.render(str(card.unit_type), True, COLOR_TEXT)
-    type_rect = type_text.get_rect()
-    type_rect.centerx = x + CARD_WIDTH // 2
-    type_rect.centery = y + CARD_HEIGHT // 2
-    screen.blit(type_text, type_rect)
+    # 生命值
+    health_font = get_chinese_font(health_font_size)
+    health_text = health_font.render(f"生命: {card.health}", True, COLOR_TEXT)
+    health_rect = health_text.get_rect()
+    health_rect.centerx = x + CARD_WIDTH // 2
+    health_rect.centery = y + int(CARD_HEIGHT * 0.85)
+    screen.blit(health_text, health_rect)
 
 
 def draw_hand(screen, game, dragging_card=None):
@@ -301,11 +319,11 @@ def draw_left_panel(screen):
         "  部署兵种",
         "",
         "规则:",
-        "数字=兵种类型",
-        "卡牌需匹配",
-        "格子数字",
+        "数字=周围怪物数",
+        "任意卡牌可部署",
+        "到任意数字格子",
         "点击结束回合",
-        "消耗倒计时"
+        "获得新卡牌"
     ]
     
     y_offset = LEFT_PANEL_Y + max(10, int(15 * ui_scale))

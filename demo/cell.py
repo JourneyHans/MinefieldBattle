@@ -61,15 +61,16 @@ class NumberCell(Cell):
         if self.state == CellState.HIDDEN:
             return ""
         elif self.state == CellState.DEPLOYED and self.unit:
-            # 显示实际战力（考虑团结一致效果）
+            # 已部署兵种的格子：显示兵种名称、战力、生命值
             actual_power = self.unit.get_effective_power()
             if self.unit.unity_bonus_count > 0:
                 # 如果有团结一致效果，显示特殊标记
                 mark = "*" * self.unit.unity_bonus_count  # 1次效果显示*，2次显示**
-                return f"{self.number}\n{self.unit.name}\n战力:{actual_power}{mark}"
+                return f"{self.unit.name}\n战力:{actual_power}{mark}\n生命:{self.unit.health}"
             else:
-                return f"{self.number}\n{self.unit.name}\n战力:{actual_power}"
+                return f"{self.unit.name}\n战力:{actual_power}\n生命:{self.unit.health}"
         else:
+            # 数字格子：只显示数字（扫雷作用）
             # 数字为0时不显示
             if self.number == 0:
                 return ""
