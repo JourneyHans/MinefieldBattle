@@ -14,6 +14,8 @@ _working_font_name = None
 
 def get_chinese_font(size):
     """获取支持中文的字体（带缓存）"""
+    global _working_font_name, _font_cache
+    
     # 如果已经找到可用的字体名称，直接使用
     if _working_font_name:
         try:
@@ -34,7 +36,6 @@ def get_chinese_font(size):
             test_surface = font.render('测试', True, (0, 0, 0))
             if test_surface.get_width() > 0:
                 # 缓存字体名称和字体对象
-                global _working_font_name
                 _working_font_name = font_name
                 _font_cache[size] = font
                 return font
