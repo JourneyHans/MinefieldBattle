@@ -10,6 +10,45 @@ from card import Card
 from task_validator import TaskValidator
 from config_mgr import CARDS_PER_TURN, MAX_HAND_SIZE, MONSTER_BASE_POWER, MONSTER_POWER_DIVISOR, INITIAL_HEALTH, TaskType, TASK_COUNT
 
+# 怪物战力权重表（key: 战力值, value: 权重）
+# 低战力拥有更高权重，以降低平均值
+MONSTER_POWER_WEIGHTS = {
+    1: 12,
+    2: 11,
+    3: 11,
+    4: 10,
+    5: 9,
+    6: 8,
+    7: 8,
+    8: 7,
+    9: 7,
+    10: 6,
+    11: 5,
+    12: 5,
+    13: 4,
+    14: 4,
+    15: 3,
+    16: 3,
+    17: 2,
+    18: 2,
+    19: 2,
+    20: 2,
+    21: 1,
+    22: 1,
+    23: 1,
+    24: 1,
+    25: 1,
+    26: 1,
+    27: 1,
+    28: 1,
+    29: 1,
+    30: 1,
+    31: 1,
+    32: 1,
+}
+
+MONSTER_POWER_TOTAL_WEIGHT = sum(MONSTER_POWER_WEIGHTS.values())
+
 
 class Game:
     """游戏主类"""
@@ -425,30 +464,19 @@ class Game:
     
     def _weighted_random_monster_power(self):
         """
-        使用正态分布生成怪物战力（1-32）
-        均值约16，标准差约8，使得中间值概率高，两端概率低
-        数值越高权重越小（通过正态分布自然实现）
+        使用预定义权重表生成怪物战力（1-32）
+        低数值拥有更高权重，使整体战力分布更低
         返回: 1-32 的怪物战力值
         """
-        mean = 16.0  # 均值，接近中间值
-        std_dev = 8.0  # 标准差
-        
-        # 使用正态分布生成值，如果超出范围则重新采样
-        max_attempts = 100
-        for _ in range(max_attempts):
-            # 使用Box-Muller变换生成正态分布随机数
-            u1 = random.random()
-            u2 = random.random()
-            z = math.sqrt(-2.0 * math.log(u1)) * math.cos(2.0 * math.pi * u2)
-            value = mean + std_dev * z
-            
-            # 截断到1-32范围
-            power = int(round(value))
-            if 1 <= power <= 32:
+        target = random.randint(1, MONSTER_POWER_TOTAL_WEIGHT)
+        cumulative = 0
+        for power, weight in MONSTER_POWER_WEIGHTS.items():
+            cumulative += weight
+            if target <= cumulative:
                 return power
         
-        # 如果多次尝试都失败，返回中间值
-        return 16
+        # 理论上不会到这里，兜底返回最低权重对应值
+        return 1
     
     def update(self):
         """
