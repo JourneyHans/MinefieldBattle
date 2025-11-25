@@ -4,10 +4,11 @@
 """
 import random
 import math
-from cell import Cell, NumberCell, MonsterCell, CellState
+from cell import Cell, NumberCell, MonsterCell, TaskCell, CellState
 from unit import Unit
 from card import Card
-from config_mgr import CARDS_PER_TURN, MAX_HAND_SIZE, MONSTER_BASE_POWER, MONSTER_POWER_DIVISOR, INITIAL_HEALTH
+from task_validator import TaskValidator
+from config_mgr import CARDS_PER_TURN, MAX_HAND_SIZE, MONSTER_BASE_POWER, MONSTER_POWER_DIVISOR, INITIAL_HEALTH, TaskType, TASK_COUNT
 
 
 class Game:
@@ -35,6 +36,11 @@ class Game:
         self.current_turn = 1  # 当前回合数
         self.hand = []  # 玩家手牌列表
         
+        # 任务系统
+        self.task_cell = None  # 任务格子
+        self.task_validator = TaskValidator()  # 任务判定器
+        self.main_task_type = None  # 当前通关任务类型
+        
         self._generate_map()
         # 游戏开始时发牌
         self._deal_cards()
@@ -57,10 +63,30 @@ class Game:
                 self.monsters.append(monster)
             attempts += 1
         
-        # 2. 计算每个格子的数字（相邻怪物数量）
+        # 2. 随机生成任务格子（确保不与怪物格子重叠）
+        task_positions = []
+        task_attempts = 0
+        max_task_attempts = 1000
+        
+        while len(task_positions) < TASK_COUNT and task_attempts < max_task_attempts:
+            row = random.randint(0, self.height - 1)
+            col = random.randint(0, self.width - 1)
+            
+            # 确保不与怪物格子重叠
+            if (row, col) not in monster_positions and (row, col) not in task_positions:
+                task_positions.append((row, col))
+                # 随机选择一种任务类型作为通关任务
+                task_type = random.choice(list(TaskType))
+                task_cell = TaskCell(row, col, task_type)
+                self.grid[row][col] = task_cell
+                self.task_cell = task_cell
+                self.main_task_type = task_type
+            task_attempts += 1
+        
+        # 3. 计算每个格子的数字（相邻怪物数量）
         for row in range(self.height):
             for col in range(self.width):
-                if self.grid[row][col] is None:  # 不是怪物格子
+                if self.grid[row][col] is None:  # 不是怪物格子也不是任务格子
                     # 计算相邻怪物数量
                     count = self._count_adjacent_monsters(row, col)
                     # 创建数字格子（如果没有相邻怪物，数字为0，但显示为空白）
@@ -250,6 +276,9 @@ class Game:
                 monster_power = self._weighted_random_monster_power()
                 cell.set_monster_power(monster_power)
                 # 不进行战斗结算，怪物处于待机状态
+            elif isinstance(cell, TaskCell):
+                # 任务格子，揭示它
+                cell.reveal()
             else:
                 # 数字格子，实现空白区域自动展开（只有数字为0时才展开）
                 if isinstance(cell, NumberCell) and cell.number == 0:
@@ -265,6 +294,16 @@ class Game:
         if isinstance(cell, MonsterCell) and cell.triggered and cell.battle_won is None:
             # 再次点击已触发的怪物，进行战斗结算
             self._battle_settlement(cell)
+            return True
+        
+        # 如果格子已揭示，检查是否是任务格子
+        if isinstance(cell, TaskCell):
+            # 如果任务已完成但未确认，再次点击确认任务
+            if cell.task_completed and not cell.task_claimed:
+                if cell.claim_task():
+                    # 任务已确认，检查是否通关
+                    self._check_win_condition()
+                    return True
             return True
         
         return False
@@ -442,14 +481,13 @@ class Game:
                 new_unity_queue.append((row, col, start_time))
         self.unity_animation_queue = new_unity_queue
         
-        # 检查胜利条件：玩家生命值没有降到0，且所有怪物都被结算了
+        # 检查任务完成状态
+        if self.task_cell and not self.task_cell.task_completed:
+            self.check_task_completion()
+        
+        # 检查胜利条件：玩家生命值没有降到0，且通关任务已完成并已确认
         if self.health > 0 and not self.game_over:
-            # 检查所有怪物是否都已结算（battle_won不为None）
-            all_monsters_settled = self._check_all_monsters_settled()
-            
-            if all_monsters_settled:
-                self.game_over = True
-                self.game_won = True
+            self._check_win_condition()
     
     def _battle_settlement(self, monster_cell):
         """
@@ -497,6 +535,36 @@ class Game:
                     if cell.battle_won is None:
                         return False
         return True
+    
+    def check_task_completion(self):
+        """
+        检查任务完成状态并更新任务格子
+        """
+        if not self.task_cell or not self.main_task_type:
+            return
+        
+        # 如果任务已完成，不需要再次检查
+        if self.task_cell.task_completed:
+            return
+        
+        # 使用任务判定器检查任务是否完成
+        is_completed = self.task_validator.is_task_completed(
+            self.main_task_type, 
+            self.task_cell, 
+            self
+        )
+        
+        # 如果任务完成，标记任务格子
+        if is_completed:
+            self.task_cell.complete_task()
+    
+    def _check_win_condition(self):
+        """
+        检查胜利条件：通关任务是否已完成并已确认
+        """
+        if self.task_cell and self.task_cell.task_claimed:
+            self.game_over = True
+            self.game_won = True
     
     def get_player_power_around_monster(self, monster_cell):
         """获取怪物周围玩家的战力（向下取整）"""
@@ -560,6 +628,8 @@ class Game:
                         info.append("战斗结果: 怪物胜利")
             else:
                 info.append("未触发")
+        elif isinstance(cell, TaskCell):
+            return self.get_task_info(row, col)
         else:
             info.append(f"未知格子 ({row}, {col})")
         
@@ -601,6 +671,63 @@ class Game:
                     info.append("战斗结果: 怪物胜利")
         else:
             info.append("未触发")
+        
+        return info
+    
+    def get_task_info(self, row, col):
+        """
+        获取任务格子的详细信息
+        只有已揭示的任务才显示详细信息，未揭示的任务不显示具体信息（防止作弊）
+        :param row: 行
+        :param col: 列
+        :return: 详细信息文本列表
+        """
+        if not (0 <= row < self.height and 0 <= col < self.width):
+            return []
+        
+        cell = self.grid[row][col]
+        if not isinstance(cell, TaskCell):
+            return []
+        
+        info = []
+        
+        # 如果任务未揭示，只显示基本信息，不显示具体内容
+        if not cell.is_revealed():
+            info.append(f"未揭示格子 ({row}, {col})")
+            return info
+        
+        # 已揭示的任务显示详细信息
+        from config_mgr import TASK_TYPE_NAMES, TASK_TYPE_DESCRIPTIONS
+        task_name = TASK_TYPE_NAMES.get(cell.task_type, "任务")
+        task_desc = TASK_TYPE_DESCRIPTIONS.get(cell.task_type, "")
+        
+        info.append(f"任务格子 ({row}, {col})")
+        info.append(f"任务: {task_name}")
+        info.append(f"要求: {task_desc}")
+        
+        if cell.task_claimed:
+            info.append("状态: 已确认")
+        elif cell.task_completed:
+            info.append("状态: 已完成")
+            info.append("提示: 再次点击确认")
+        else:
+            info.append("状态: 进行中")
+            # 根据任务类型显示进度信息
+            if cell.task_type == TaskType.EXPLORE_ADJACENT:
+                # 显示已探查的相邻格子数量
+                adjacent_cells = self._get_adjacent_cells(row, col)
+                explored_count = sum(1 for c in adjacent_cells if c.is_revealed())
+                info.append(f"进度: {explored_count}/8 已探查")
+            elif cell.task_type == TaskType.BATTLE_ALL_MONSTERS:
+                # 显示已战斗的怪物数量
+                total_monsters = sum(1 for r in range(self.height) for c in range(self.width)
+                                   if isinstance(self.grid[r][c], MonsterCell))
+                battled_monsters = sum(1 for r in range(self.height) for c in range(self.width)
+                                     if isinstance(self.grid[r][c], MonsterCell)
+                                     and self.grid[r][c].battle_won is not None)
+                info.append(f"进度: {battled_monsters}/{total_monsters} 已战斗")
+            elif cell.task_type == TaskType.FIND_TASK:
+                info.append("进度: 已完成（找到任务）")
         
         return info
     

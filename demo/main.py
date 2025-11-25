@@ -7,7 +7,7 @@ import sys
 import random
 from config_mgr import *
 from game import Game
-from cell import MonsterCell, NumberCell, CellState
+from cell import MonsterCell, NumberCell, TaskCell, CellState
 from card import Card
 
 
@@ -90,6 +90,16 @@ def draw_cell(screen, cell, x, y, game=None):
                 color = COLOR_MONSTER_WON
         elif cell.state == CellState.REVEALED:
             color = COLOR_MONSTER
+        else:
+            color = COLOR_HIDDEN
+    elif isinstance(cell, TaskCell):
+        # 任务格子：根据状态显示不同颜色
+        if cell.task_claimed:
+            color = COLOR_TASK_CLAIMED
+        elif cell.task_completed:
+            color = COLOR_TASK_COMPLETED
+        elif cell.state == CellState.REVEALED:
+            color = COLOR_TASK
         else:
             color = COLOR_HIDDEN
     elif isinstance(cell, NumberCell):
@@ -386,6 +396,8 @@ def get_hovered_object(game, mouse_x, mouse_y):
         if cell:
             if isinstance(cell, MonsterCell):
                 return ('monster', cell)
+            elif isinstance(cell, TaskCell):
+                return ('task', cell)
             else:
                 return ('cell', cell)
     
@@ -411,6 +423,9 @@ def get_hover_info(game, hovered_type, hovered_object):
         return game.get_cell_info(row, col)
     elif hovered_type == 'monster' and hovered_object:
         return game.get_monster_info(hovered_object)
+    elif hovered_type == 'task' and hovered_object:
+        row, col = hovered_object.row, hovered_object.col
+        return game.get_task_info(row, col)
     else:
         return ["悬停查看详细信息"]
 
@@ -452,6 +467,12 @@ def draw_ui(screen, game, mouse_pos):
             color = (100, 255, 200)  # 青色
         elif "未部署" in text or "未触发" in text:
             color = (200, 200, 200)  # 灰色
+        elif "任务" in text or "任务格子" in text:
+            color = (255, 200, 255)  # 紫色（任务相关）
+        elif "已确认" in text or "已完成" in text:
+            color = (150, 255, 150)  # 浅绿色（任务完成）
+        elif "进行中" in text or "进度" in text:
+            color = (255, 255, 150)  # 黄色（任务进行中）
         else:
             color = COLOR_UI_TEXT  # 默认白色
         

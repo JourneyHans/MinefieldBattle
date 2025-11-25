@@ -8,6 +8,7 @@ from config import map_config
 from config import game_config
 from config import ui_config
 from config import card_config
+from config import task_config
 
 # 从各个子配置模块导入所有配置项，重新导出以保持向后兼容
 
@@ -81,6 +82,17 @@ CARD_MARGIN = ui_config.CARD_MARGIN  # 从ui_config导入（会被calculate_layo
 CARDS_PER_TURN = card_config.CARDS_PER_TURN
 MAX_HAND_SIZE = card_config.MAX_HAND_SIZE
 UNIT_NAMES = card_config.UNIT_NAMES
+
+# 任务配置
+TaskType = task_config.TaskType
+TASK_COUNT = task_config.TASK_COUNT
+TASK_TYPE_NAMES = task_config.TASK_TYPE_NAMES
+TASK_TYPE_DESCRIPTIONS = task_config.TASK_TYPE_DESCRIPTIONS
+
+# UI配置 - 任务颜色
+COLOR_TASK = ui_config.COLOR_TASK
+COLOR_TASK_COMPLETED = ui_config.COLOR_TASK_COMPLETED
+COLOR_TASK_CLAIMED = ui_config.COLOR_TASK_CLAIMED
 
 # 导出布局计算函数
 calculate_layout = ui_config.calculate_layout

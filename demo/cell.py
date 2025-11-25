@@ -112,3 +112,49 @@ class MonsterCell(Cell):
         """设置战斗结果"""
         self.battle_won = player_won
 
+
+class TaskCell(Cell):
+    """任务格子"""
+    
+    def __init__(self, row, col, task_type):
+        """
+        初始化任务格子
+        :param row: 行
+        :param col: 列
+        :param task_type: 任务类型（TaskType枚举）
+        """
+        super().__init__(row, col)
+        self.task_type = task_type  # 任务类型
+        self.task_completed = False  # 任务是否已完成
+        self.task_claimed = False  # 任务是否已被领取/确认
+    
+    def __str__(self):
+        return f"TaskCell({self.row}, {self.col}, {self.task_type.value})"
+    
+    def complete_task(self):
+        """标记任务完成"""
+        self.task_completed = True
+    
+    def claim_task(self):
+        """确认任务（再次点击时调用）"""
+        if self.task_completed:
+            self.task_claimed = True
+            return True
+        return False
+    
+    def get_display_text(self):
+        """获取显示文本"""
+        from config.task_config import TASK_TYPE_NAMES
+        
+        if self.state == CellState.HIDDEN:
+            return ""
+        
+        # 已揭示状态
+        task_name = TASK_TYPE_NAMES.get(self.task_type, "任务")
+        
+        if self.task_claimed:
+            return f"任务\n{task_name}\n已确认"
+        elif self.task_completed:
+            return f"任务\n{task_name}\n已完成\n点击确认"
+        else:
+            return f"任务\n{task_name}"
