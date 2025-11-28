@@ -4,7 +4,12 @@
 提供字体、坐标计算等通用工具函数
 """
 import pygame
-from config_mgr import *
+import config_mgr
+
+# 动态获取配置值的辅助函数
+def get_config(name):
+    """动态获取配置值"""
+    return getattr(config_mgr, name)
 
 
 # 字体缓存：避免重复测试字体
@@ -50,6 +55,11 @@ def get_chinese_font(size):
 # 坐标计算辅助函数
 def get_cell_position(row, col):
     """计算格子的屏幕坐标"""
+    MAP_START_X = get_config('MAP_START_X')
+    MAP_START_Y = get_config('MAP_START_Y')
+    CELL_MARGIN = get_config('CELL_MARGIN')
+    CELL_SIZE = get_config('CELL_SIZE')
+    
     x = MAP_START_X + CELL_MARGIN + col * (CELL_SIZE + CELL_MARGIN)
     y = MAP_START_Y + CELL_MARGIN + row * (CELL_SIZE + CELL_MARGIN)
     return x, y
@@ -57,6 +67,11 @@ def get_cell_position(row, col):
 
 def get_cell_from_screen_pos(mouse_x, mouse_y):
     """从屏幕坐标获取格子坐标"""
+    MAP_START_X = get_config('MAP_START_X')
+    MAP_START_Y = get_config('MAP_START_Y')
+    CELL_MARGIN = get_config('CELL_MARGIN')
+    CELL_SIZE = get_config('CELL_SIZE')
+    
     col = int((mouse_x - MAP_START_X - CELL_MARGIN) // (CELL_SIZE + CELL_MARGIN))
     row = int((mouse_y - MAP_START_Y - CELL_MARGIN) // (CELL_SIZE + CELL_MARGIN))
     return row, col
@@ -64,6 +79,11 @@ def get_cell_from_screen_pos(mouse_x, mouse_y):
 
 def get_card_position(card_index):
     """计算手牌的屏幕坐标"""
+    HAND_AREA_X = get_config('HAND_AREA_X')
+    HAND_AREA_Y = get_config('HAND_AREA_Y')
+    CARD_WIDTH = get_config('CARD_WIDTH')
+    CARD_MARGIN = get_config('CARD_MARGIN')
+    
     card_x = HAND_AREA_X + card_index * (CARD_WIDTH + CARD_MARGIN)
     card_y = HAND_AREA_Y
     return card_x, card_y
@@ -71,6 +91,9 @@ def get_card_position(card_index):
 
 def get_card_at_position(game, x, y):
     """获取指定位置的手牌卡牌"""
+    CARD_WIDTH = get_config('CARD_WIDTH')
+    CARD_HEIGHT = get_config('CARD_HEIGHT')
+    
     for i, card in enumerate(game.hand):
         card_x, card_y = get_card_position(i)
         card_rect = pygame.Rect(card_x, card_y, CARD_WIDTH, CARD_HEIGHT)

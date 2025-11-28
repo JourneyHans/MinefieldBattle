@@ -3,9 +3,14 @@
 UI辅助函数模块
 提供UI相关的辅助函数
 """
-from config_mgr import *
+import config_mgr
 from cell import MonsterCell, TaskCell
 from utils import get_card_position, get_cell_from_screen_pos
+
+# 动态获取配置值的辅助函数
+def get_config(name):
+    """动态获取配置值"""
+    return getattr(config_mgr, name)
 
 
 def get_hovered_object(game, mouse_x, mouse_y):
@@ -17,7 +22,10 @@ def get_hovered_object(game, mouse_x, mouse_y):
     :return: (object_type, object) 元组，object_type可以是 'card', 'cell', 'monster', None
     """
     import pygame
-    from config_mgr import CARD_WIDTH, CARD_HEIGHT
+    CARD_WIDTH = get_config('CARD_WIDTH')
+    CARD_HEIGHT = get_config('CARD_HEIGHT')
+    MAP_WIDTH = get_config('MAP_WIDTH')
+    MAP_HEIGHT = get_config('MAP_HEIGHT')
     
     # 检查是否悬停在手牌上
     for i, card in enumerate(game.hand):

@@ -24,9 +24,18 @@ COLOR_UI_BG = (50, 50, 50)  # UI背景 - 深灰色
 COLOR_UI_TEXT = (255, 255, 255)  # UI文字 - 白色
 
 # 窗口配置 - 固定16:9分辨率
-WINDOW_SCALE = 1.5
-WINDOW_WIDTH = int(640 * WINDOW_SCALE)  # 窗口宽度
-WINDOW_HEIGHT = int(360 * WINDOW_SCALE)  # 窗口高度
+# 基础分辨率
+BASE_WIDTH = 640
+BASE_HEIGHT = 360
+
+# 分辨率缩放（可以动态修改）
+WINDOW_SCALE = 1.5  # 默认1.5倍
+WINDOW_WIDTH = int(BASE_WIDTH * WINDOW_SCALE)  # 窗口宽度
+WINDOW_HEIGHT = int(BASE_HEIGHT * WINDOW_SCALE)  # 窗口高度
+
+# 设置按钮配置
+SETTINGS_BUTTON_SIZE = 30  # 设置按钮大小（会根据分辨率缩放）
+SETTINGS_BUTTON_MARGIN = 10  # 设置按钮边距
 
 # 布局配置（将在calculate_layout()中动态计算）
 # 这些变量将在布局计算后设置
@@ -64,6 +73,12 @@ BUTTON_COLOR = (100, 150, 200)  # 按钮颜色
 BUTTON_HOVER_COLOR = (120, 170, 220)  # 按钮悬停颜色
 BUTTON_TEXT_COLOR = (255, 255, 255)  # 按钮文字颜色
 
+# 设置界面配置
+SETTINGS_PANEL_COLOR = (60, 60, 80)  # 设置面板背景色
+SETTINGS_PANEL_ALPHA = 240  # 设置面板透明度
+SETTINGS_BUTTON_COLOR = (80, 120, 160)  # 设置界面按钮颜色
+SETTINGS_BUTTON_HOVER_COLOR = (100, 140, 180)  # 设置界面按钮悬停颜色
+
 
 def calculate_layout():
     """
@@ -85,22 +100,30 @@ def calculate_layout():
     # 基础边距（确保是整数）
     margin = int(max(5, min(WINDOW_WIDTH, WINDOW_HEIGHT) // 40))
     
+    # 生命条高度和位置（在顶部）
+    health_bar_height = max(30, int(WINDOW_HEIGHT * 0.04))
+    health_bar_y = max(5, int(WINDOW_HEIGHT * 0.01))
+    health_bar_bottom = health_bar_y + health_bar_height
+    
+    # 棋盘和手牌区的起始位置（在生命条下方，留出更多空间）
+    content_start_y = int(health_bar_bottom + margin * 2)  # 生命条下方留出更多空间
+    
     # 左边面板（操作说明）- 不显眼，较小
     LEFT_PANEL_WIDTH = int(max(120, WINDOW_WIDTH // 8))
     LEFT_PANEL_X = int(margin)
-    LEFT_PANEL_Y = int(margin)
-    LEFT_PANEL_HEIGHT = int(WINDOW_HEIGHT - margin * 2)
+    LEFT_PANEL_Y = int(content_start_y)
+    LEFT_PANEL_HEIGHT = int(WINDOW_HEIGHT - content_start_y - margin)
     
     # 右边面板（游戏状态）- 中等大小
     RIGHT_PANEL_WIDTH = int(max(150, WINDOW_WIDTH // 6))
     RIGHT_PANEL_X = int(WINDOW_WIDTH - RIGHT_PANEL_WIDTH - margin)
-    RIGHT_PANEL_Y = int(margin)
-    RIGHT_PANEL_HEIGHT = int(WINDOW_HEIGHT - margin * 2)
+    RIGHT_PANEL_Y = int(content_start_y)
+    RIGHT_PANEL_HEIGHT = int(WINDOW_HEIGHT - content_start_y - margin)
     
     # 中间区域（棋盘和手牌）- 占据主要空间
     center_area_x = int(LEFT_PANEL_X + LEFT_PANEL_WIDTH + margin)
     center_area_width = int(RIGHT_PANEL_X - center_area_x - margin)
-    center_area_height = int(WINDOW_HEIGHT - margin * 2)
+    center_area_height = int(WINDOW_HEIGHT - content_start_y - margin)
     
     # 手牌区域预留高度（按窗口高度比例，但不要太大）
     hand_area_reserved_height = int(max(60, center_area_height // 5))
@@ -109,21 +132,21 @@ def calculate_layout():
     available_width_for_map = int(center_area_width - margin * 2)
     available_height_for_map = int(center_area_height - hand_area_reserved_height - margin * 2)
     
-    # 计算格子大小（让棋盘尽可能大）
+    # 计算格子大小（让棋盘尽可能大，但至少保证文本不超框）
     cell_size_by_width = int((available_width_for_map - margin) // (MAP_WIDTH + 1))
     cell_size_by_height = int((available_height_for_map - margin) // (MAP_HEIGHT + 1))
     
-    # 取较小值，确保地图完整显示
-    CELL_SIZE = int(max(20, min(cell_size_by_width, cell_size_by_height)))
+    # 取较小值，但设置最小值为40（确保文本不超框）
+    CELL_SIZE = int(max(40, min(cell_size_by_width, cell_size_by_height)))
     CELL_MARGIN = int(max(1, CELL_SIZE // 25))
     
     # 计算地图区域实际大小
     MAP_AREA_WIDTH = int(MAP_WIDTH * (CELL_SIZE + CELL_MARGIN) + CELL_MARGIN)
     MAP_AREA_HEIGHT = int(MAP_HEIGHT * (CELL_SIZE + CELL_MARGIN) + CELL_MARGIN)
     
-    # 地图在中间区域居中
+    # 地图在中间区域居中（从content_start_y开始）
     MAP_START_X = int(center_area_x + (center_area_width - MAP_AREA_WIDTH) // 2)
-    MAP_START_Y = int(margin + (available_height_for_map - MAP_AREA_HEIGHT) // 2)
+    MAP_START_Y = int(content_start_y + (available_height_for_map - MAP_AREA_HEIGHT) // 2)
     
     # 手牌区域位置和大小（在棋盘下方，居中）
     HAND_AREA_X = int(center_area_x + (center_area_width - MAP_AREA_WIDTH) // 2)
@@ -148,6 +171,13 @@ def calculate_layout():
     BUTTON_HEIGHT = int(max(30, int(40 * button_scale)))
     BUTTON_X = int(UI_PANEL_X + (UI_PANEL_WIDTH - BUTTON_WIDTH) // 2)  # 居中
     BUTTON_Y = int(UI_PANEL_Y + UI_PANEL_HEIGHT - BUTTON_HEIGHT - margin)  # 底部
+    
+    # 设置按钮位置（右上角）
+    global SETTINGS_BUTTON_X, SETTINGS_BUTTON_Y, SETTINGS_BUTTON_SIZE_SCALED
+    settings_button_size = int(SETTINGS_BUTTON_SIZE * WINDOW_SCALE)
+    SETTINGS_BUTTON_X = int(WINDOW_WIDTH - settings_button_size - SETTINGS_BUTTON_MARGIN * WINDOW_SCALE)
+    SETTINGS_BUTTON_Y = int(SETTINGS_BUTTON_MARGIN * WINDOW_SCALE)
+    SETTINGS_BUTTON_SIZE_SCALED = settings_button_size
 
 
 # 初始化布局

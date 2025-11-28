@@ -5,15 +5,30 @@
 """
 import pygame
 import time
-from config_mgr import *
+import config_mgr
 from cell import MonsterCell, NumberCell, TaskCell, CellState
 from constants import *
 from utils import get_chinese_font, get_cell_position
 from ui_helper import get_hovered_object, get_hover_info
 
+# 动态获取配置值的辅助函数
+def get_config(name):
+    """动态获取配置值"""
+    return getattr(config_mgr, name)
+
 
 def get_cell_color(cell):
     """获取格子的颜色"""
+    COLOR_HIDDEN = get_config('COLOR_HIDDEN')
+    COLOR_MONSTER = get_config('COLOR_MONSTER')
+    COLOR_MONSTER_WON = get_config('COLOR_MONSTER_WON')
+    COLOR_MONSTER_LOST = get_config('COLOR_MONSTER_LOST')
+    COLOR_TASK = get_config('COLOR_TASK')
+    COLOR_TASK_COMPLETED = get_config('COLOR_TASK_COMPLETED')
+    COLOR_TASK_CLAIMED = get_config('COLOR_TASK_CLAIMED')
+    COLOR_DEPLOYED = get_config('COLOR_DEPLOYED')
+    COLOR_NUMBER = get_config('COLOR_NUMBER')
+    
     if isinstance(cell, MonsterCell):
         # 检查战斗结果
         if cell.battle_won is not None:
@@ -45,6 +60,8 @@ def get_cell_color(cell):
 
 def calculate_text_font_size(lines, available_width, available_height):
     """计算文本的合适字体大小"""
+    COLOR_TEXT = get_config('COLOR_TEXT')
+    
     # 初始字体大小：根据行数计算
     base_font_size = min(14, available_height // len(lines) - 2)
     base_font_size = max(MIN_FONT_SIZE, base_font_size)
@@ -81,6 +98,9 @@ def calculate_text_font_size(lines, available_width, available_height):
 
 def draw_cell(screen, cell, x, y, game=None):
     """绘制单个格子"""
+    CELL_SIZE = get_config('CELL_SIZE')
+    COLOR_TEXT = get_config('COLOR_TEXT')
+    
     rect = pygame.Rect(x, y, CELL_SIZE, CELL_SIZE)
     
     # 确定颜色
@@ -123,6 +143,7 @@ def draw_cell(screen, cell, x, y, game=None):
 
 def draw_unity_animation(screen, game):
     """绘制团结一致动画效果（扫光效果）"""
+    CELL_SIZE = get_config('CELL_SIZE')
     current_time = time.time()
     
     for row, col, start_time in game.unity_animation_queue:
@@ -167,6 +188,9 @@ def draw_unity_animation(screen, game):
 def draw_card(screen, card, x, y, selected=False):
     """绘制一张卡牌"""
     from config.card_config import UnitCategory
+    CARD_WIDTH = get_config('CARD_WIDTH')
+    CARD_HEIGHT = get_config('CARD_HEIGHT')
+    COLOR_TEXT = get_config('COLOR_TEXT')
     
     # 卡牌背景（使用卡牌类型对应的颜色）
     card_rect = pygame.Rect(x, y, CARD_WIDTH, CARD_HEIGHT)
@@ -228,6 +252,14 @@ def draw_card(screen, card, x, y, selected=False):
 
 def draw_hand(screen, game, dragging_card=None):
     """绘制手牌"""
+    HAND_AREA_X = get_config('HAND_AREA_X')
+    HAND_AREA_Y = get_config('HAND_AREA_Y')
+    HAND_AREA_WIDTH = get_config('HAND_AREA_WIDTH')
+    CARD_WIDTH = get_config('CARD_WIDTH')
+    CARD_HEIGHT = get_config('CARD_HEIGHT')
+    CARD_MARGIN = get_config('CARD_MARGIN')
+    COLOR_TEXT = get_config('COLOR_TEXT')
+    
     hand_y = HAND_AREA_Y
     hand_x_start = HAND_AREA_X
     
@@ -248,7 +280,10 @@ def draw_hand(screen, game, dragging_card=None):
 
 def draw_health_bar(screen, game):
     """在窗口顶部绘制生命值血条"""
-    from config_mgr import INITIAL_HEALTH
+    WINDOW_WIDTH = get_config('WINDOW_WIDTH')
+    WINDOW_HEIGHT = get_config('WINDOW_HEIGHT')
+    INITIAL_HEALTH = get_config('INITIAL_HEALTH')
+    COLOR_UI_TEXT = get_config('COLOR_UI_TEXT')
     
     # 血条配置
     bar_height = max(30, int(WINDOW_HEIGHT * 0.04))
@@ -299,6 +334,11 @@ def draw_health_bar(screen, game):
 
 def draw_left_panel(screen):
     """绘制左侧操作说明面板（不显眼）"""
+    LEFT_PANEL_X = get_config('LEFT_PANEL_X')
+    LEFT_PANEL_Y = get_config('LEFT_PANEL_Y')
+    LEFT_PANEL_WIDTH = get_config('LEFT_PANEL_WIDTH')
+    LEFT_PANEL_HEIGHT = get_config('LEFT_PANEL_HEIGHT')
+    
     # 绘制左侧面板背景（浅灰色，不显眼）
     left_rect = pygame.Rect(LEFT_PANEL_X, LEFT_PANEL_Y, LEFT_PANEL_WIDTH, LEFT_PANEL_HEIGHT)
     pygame.draw.rect(screen, (220, 220, 220), left_rect)
@@ -337,6 +377,8 @@ def draw_left_panel(screen):
 
 def get_text_color(text):
     """根据文本内容获取颜色"""
+    COLOR_UI_TEXT = get_config('COLOR_UI_TEXT')
+    
     # 胜利/优势相关 - 绿色系
     if "战力优势" in text or "玩家胜利" in text:
         return (100, 255, 100)  # 绿色
@@ -365,8 +407,58 @@ def get_text_color(text):
     return COLOR_UI_TEXT
 
 
+def wrap_text(text, font, max_width):
+    """
+    将文本按最大宽度换行（支持中英文混合）
+    :param text: 要换行的文本
+    :param font: 字体对象
+    :param max_width: 最大宽度
+    :return: 换行后的文本列表
+    """
+    if not text:
+        return [text]
+    
+    # 如果文本本身不超过最大宽度，直接返回
+    if font.size(text)[0] <= max_width:
+        return [text]
+    
+    lines = []
+    current_line = ""
+    
+    # 按字符处理（支持中文字符）
+    for char in text:
+        # 测试添加这个字符后的宽度
+        test_line = current_line + char
+        test_width = font.size(test_line)[0]
+        
+        if test_width <= max_width:
+            current_line = test_line
+        else:
+            # 如果当前行不为空，保存它并开始新行
+            if current_line:
+                lines.append(current_line)
+            # 如果单个字符就超过宽度（理论上不应该发生），直接添加
+            if font.size(char)[0] > max_width:
+                lines.append(char)
+                current_line = ""
+            else:
+                current_line = char
+    
+    # 添加最后一行
+    if current_line:
+        lines.append(current_line)
+    
+    return lines if lines else [text]
+
+
 def draw_ui(screen, game, mouse_pos):
     """绘制右侧悬停对象信息UI"""
+    UI_PANEL_X = get_config('UI_PANEL_X')
+    UI_PANEL_Y = get_config('UI_PANEL_Y')
+    UI_PANEL_WIDTH = get_config('UI_PANEL_WIDTH')
+    UI_PANEL_HEIGHT = get_config('UI_PANEL_HEIGHT')
+    COLOR_UI_BG = get_config('COLOR_UI_BG')
+    
     ui_x = UI_PANEL_X
     
     # 绘制UI背景
@@ -387,16 +479,41 @@ def draw_ui(screen, game, mouse_pos):
     
     font = get_chinese_font(font_size)
     
+    # 计算可用宽度（留出左右边距）
+    available_width = UI_PANEL_WIDTH - 20  # 左右各留10像素边距
+    
     y_offset = UI_PANEL_Y + max(15, int(20 * ui_scale))
     for text in info_texts:
         color = get_text_color(text)
-        text_surface = font.render(text, True, color)
-        screen.blit(text_surface, (ui_x + 10, y_offset))
-        y_offset += line_spacing
+        
+        # 对文本进行换行处理
+        wrapped_lines = wrap_text(text, font, available_width)
+        
+        for line in wrapped_lines:
+            text_surface = font.render(line, True, color)
+            screen.blit(text_surface, (ui_x + 10, y_offset))
+            y_offset += line_spacing
+            
+            # 如果超出面板高度，停止绘制
+            if y_offset > UI_PANEL_Y + UI_PANEL_HEIGHT - line_spacing:
+                break
+        
+        # 如果已经超出面板高度，停止处理后续文本
+        if y_offset > UI_PANEL_Y + UI_PANEL_HEIGHT - line_spacing:
+            break
 
 
 def draw_end_turn_button(screen, mouse_pos):
     """绘制结束回合按钮"""
+    BUTTON_X = get_config('BUTTON_X')
+    BUTTON_Y = get_config('BUTTON_Y')
+    BUTTON_WIDTH = get_config('BUTTON_WIDTH')
+    BUTTON_HEIGHT = get_config('BUTTON_HEIGHT')
+    BUTTON_COLOR = get_config('BUTTON_COLOR')
+    BUTTON_HOVER_COLOR = get_config('BUTTON_HOVER_COLOR')
+    BUTTON_TEXT_COLOR = get_config('BUTTON_TEXT_COLOR')
+    COLOR_TEXT = get_config('COLOR_TEXT')
+    
     button_x = BUTTON_X
     button_y = BUTTON_Y
     
@@ -423,10 +540,185 @@ def draw_end_turn_button(screen, mouse_pos):
     return button_rect
 
 
+def draw_settings_button(screen, mouse_pos):
+    """绘制设置按钮（右上角）"""
+    SETTINGS_BUTTON_X = get_config('SETTINGS_BUTTON_X')
+    SETTINGS_BUTTON_Y = get_config('SETTINGS_BUTTON_Y')
+    SETTINGS_BUTTON_SIZE_SCALED = get_config('SETTINGS_BUTTON_SIZE_SCALED')
+    SETTINGS_BUTTON_COLOR = get_config('SETTINGS_BUTTON_COLOR')
+    SETTINGS_BUTTON_HOVER_COLOR = get_config('SETTINGS_BUTTON_HOVER_COLOR')
+    COLOR_TEXT = get_config('COLOR_TEXT')
+    COLOR_UI_TEXT = get_config('COLOR_UI_TEXT')
+    
+    button_rect = pygame.Rect(SETTINGS_BUTTON_X, SETTINGS_BUTTON_Y, SETTINGS_BUTTON_SIZE_SCALED, SETTINGS_BUTTON_SIZE_SCALED)
+    
+    # 检查鼠标是否悬停
+    is_hover = button_rect.collidepoint(mouse_pos)
+    button_color = SETTINGS_BUTTON_HOVER_COLOR if is_hover else SETTINGS_BUTTON_COLOR
+    
+    # 绘制按钮
+    pygame.draw.rect(screen, button_color, button_rect)
+    pygame.draw.rect(screen, COLOR_TEXT, button_rect, 2)
+    
+    # 绘制齿轮图标（简单的⚙符号）
+    font_size = max(16, int(SETTINGS_BUTTON_SIZE_SCALED * 0.6))
+    font = get_chinese_font(font_size)
+    # 使用"⚙"符号，如果没有则使用"设置"
+    try:
+        icon_text = font.render("⚙", True, COLOR_UI_TEXT)
+    except:
+        icon_text = font.render("设", True, COLOR_UI_TEXT)
+    icon_rect = icon_text.get_rect()
+    icon_rect.center = button_rect.center
+    screen.blit(icon_text, icon_rect)
+    
+    return button_rect
+
+
+def draw_settings_panel(screen, mouse_pos, current_scale):
+    """
+    绘制设置界面
+    :param screen: 屏幕表面
+    :param mouse_pos: 鼠标位置
+    :param current_scale: 当前分辨率缩放
+    :return: (action, new_scale) action可以是 'close', 'restart', 'quit', 'change_resolution'
+    """
+    WINDOW_WIDTH = get_config('WINDOW_WIDTH')
+    WINDOW_HEIGHT = get_config('WINDOW_HEIGHT')
+    SETTINGS_PANEL_COLOR = get_config('SETTINGS_PANEL_COLOR')
+    SETTINGS_PANEL_ALPHA = get_config('SETTINGS_PANEL_ALPHA')
+    SETTINGS_BUTTON_COLOR = get_config('SETTINGS_BUTTON_COLOR')
+    SETTINGS_BUTTON_HOVER_COLOR = get_config('SETTINGS_BUTTON_HOVER_COLOR')
+    COLOR_UI_TEXT = get_config('COLOR_UI_TEXT')
+    BASE_WIDTH = get_config('BASE_WIDTH')
+    BASE_HEIGHT = get_config('BASE_HEIGHT')
+    
+    # 绘制半透明背景
+    overlay = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
+    overlay.set_alpha(SETTINGS_PANEL_ALPHA)
+    overlay.fill((0, 0, 0))
+    screen.blit(overlay, (0, 0))
+    
+    # 计算设置面板大小和位置（居中）
+    panel_width = int(WINDOW_WIDTH * 0.4)
+    panel_height = int(WINDOW_HEIGHT * 0.5)
+    panel_x = (WINDOW_WIDTH - panel_width) // 2
+    panel_y = (WINDOW_HEIGHT - panel_height) // 2
+    
+    # 绘制设置面板背景
+    panel_rect = pygame.Rect(panel_x, panel_y, panel_width, panel_height)
+    pygame.draw.rect(screen, SETTINGS_PANEL_COLOR, panel_rect)
+    pygame.draw.rect(screen, COLOR_UI_TEXT, panel_rect, 3)
+    
+    # 标题
+    title_font_size = max(24, int(WINDOW_HEIGHT * 0.04))
+    title_font = get_chinese_font(title_font_size)
+    title_text = title_font.render("设置", True, COLOR_UI_TEXT)
+    title_rect = title_text.get_rect()
+    title_rect.centerx = panel_x + panel_width // 2
+    title_rect.y = panel_y + int(WINDOW_HEIGHT * 0.03)
+    screen.blit(title_text, title_rect)
+    
+    # 按钮配置
+    button_height = max(40, int(WINDOW_HEIGHT * 0.05))
+    button_margin = max(10, int(WINDOW_HEIGHT * 0.015))
+    button_y_start = panel_y + int(WINDOW_HEIGHT * 0.1)
+    button_width = int(panel_width * 0.7)
+    button_x = panel_x + (panel_width - button_width) // 2
+    
+    action = None
+    new_scale = current_scale
+    
+    # 分辨率选择
+    font_size = max(18, int(WINDOW_HEIGHT * 0.03))
+    font = get_chinese_font(font_size)
+    resolution_label = font.render("分辨率:", True, COLOR_UI_TEXT)
+    screen.blit(resolution_label, (button_x, button_y_start))
+    
+    # 分辨率选项按钮
+    resolution_options = [1.0, 1.5, 2.0]
+    resolution_labels = ["x1 (640x360)", "x1.5 (960x540)", "x2 (1280x720)"]
+    button_y = button_y_start + int(WINDOW_HEIGHT * 0.06)
+    
+    for i, (scale, label) in enumerate(zip(resolution_options, resolution_labels)):
+        btn_rect = pygame.Rect(button_x, button_y + i * (button_height + button_margin), button_width, button_height)
+        is_hover = btn_rect.collidepoint(mouse_pos)
+        is_selected = abs(scale - current_scale) < 0.1
+        
+        # 按钮颜色
+        if is_selected:
+            btn_color = (100, 200, 100)  # 选中状态：绿色
+        elif is_hover:
+            btn_color = SETTINGS_BUTTON_HOVER_COLOR
+        else:
+            btn_color = SETTINGS_BUTTON_COLOR
+        
+        pygame.draw.rect(screen, btn_color, btn_rect)
+        pygame.draw.rect(screen, COLOR_UI_TEXT, btn_rect, 2)
+        
+        # 按钮文字
+        btn_text = font.render(label, True, COLOR_UI_TEXT)
+        btn_text_rect = btn_text.get_rect()
+        btn_text_rect.center = btn_rect.center
+        screen.blit(btn_text, btn_text_rect)
+    
+    # 重新开始按钮
+    restart_y = button_y + len(resolution_options) * (button_height + button_margin) + int(WINDOW_HEIGHT * 0.05)
+    restart_rect = pygame.Rect(button_x, restart_y, button_width, button_height)
+    is_hover_restart = restart_rect.collidepoint(mouse_pos)
+    restart_color = SETTINGS_BUTTON_HOVER_COLOR if is_hover_restart else SETTINGS_BUTTON_COLOR
+    pygame.draw.rect(screen, restart_color, restart_rect)
+    pygame.draw.rect(screen, COLOR_UI_TEXT, restart_rect, 2)
+    restart_text = font.render("重新开始", True, COLOR_UI_TEXT)
+    restart_text_rect = restart_text.get_rect()
+    restart_text_rect.center = restart_rect.center
+    screen.blit(restart_text, restart_text_rect)
+    
+    # 退出游戏按钮
+    quit_y = restart_y + button_height + button_margin
+    quit_rect = pygame.Rect(button_x, quit_y, button_width, button_height)
+    is_hover_quit = quit_rect.collidepoint(mouse_pos)
+    quit_color = SETTINGS_BUTTON_HOVER_COLOR if is_hover_quit else SETTINGS_BUTTON_COLOR
+    pygame.draw.rect(screen, quit_color, quit_rect)
+    pygame.draw.rect(screen, COLOR_UI_TEXT, quit_rect, 2)
+    quit_text = font.render("退出游戏", True, COLOR_UI_TEXT)
+    quit_text_rect = quit_text.get_rect()
+    quit_text_rect.center = quit_rect.center
+    screen.blit(quit_text, quit_text_rect)
+    
+    # 关闭按钮（右上角X）
+    close_size = max(30, int(WINDOW_HEIGHT * 0.04))
+    close_rect = pygame.Rect(panel_x + panel_width - close_size - 10, panel_y + 10, close_size, close_size)
+    is_hover_close = close_rect.collidepoint(mouse_pos)
+    close_color = (200, 100, 100) if is_hover_close else (150, 150, 150)
+    pygame.draw.rect(screen, close_color, close_rect)
+    pygame.draw.rect(screen, COLOR_UI_TEXT, close_rect, 2)
+    close_font = get_chinese_font(max(20, int(close_size * 0.6)))
+    close_text = close_font.render("×", True, COLOR_UI_TEXT)
+    close_text_rect = close_text.get_rect()
+    close_text_rect.center = close_rect.center
+    screen.blit(close_text, close_text_rect)
+    
+    return {
+        'close': close_rect,
+        'restart': restart_rect,
+        'quit': quit_rect,
+        'resolutions': [pygame.Rect(button_x, button_y + i * (button_height + button_margin), button_width, button_height) 
+                       for i in range(len(resolution_options))],
+        'resolution_scales': resolution_options
+    }
+
+
 def draw_game_over_screen(screen, game):
     """绘制游戏结束界面"""
     if not game.game_over:
         return
+    
+    from constants import BASE_WINDOW_WIDTH, BASE_WINDOW_HEIGHT, BASE_FONT_LARGE, BASE_FONT_SMALL, OVERLAY_ALPHA, RESTART_TEXT_OFFSET_BASE
+    
+    WINDOW_WIDTH = get_config('WINDOW_WIDTH')
+    WINDOW_HEIGHT = get_config('WINDOW_HEIGHT')
+    COLOR_UI_TEXT = get_config('COLOR_UI_TEXT')
     
     # 原始比例：WINDOW_WIDTH=1920时，font_large=48, font_small=24
     window_scale = min(WINDOW_WIDTH / BASE_WINDOW_WIDTH, WINDOW_HEIGHT / BASE_WINDOW_HEIGHT)

@@ -5,13 +5,27 @@
 """
 import pygame
 import random
-from config_mgr import *
+import config_mgr
 from game import Game
 from utils import get_card_at_position, get_card_position, get_cell_from_screen_pos
+
+# 动态获取配置值的辅助函数
+def get_config(name):
+    """动态获取配置值"""
+    return getattr(config_mgr, name)
 
 
 def handle_mouse_button_down(event, game, dragging_card):
     """处理鼠标按下事件"""
+    BUTTON_X = get_config('BUTTON_X')
+    BUTTON_Y = get_config('BUTTON_Y')
+    BUTTON_WIDTH = get_config('BUTTON_WIDTH')
+    BUTTON_HEIGHT = get_config('BUTTON_HEIGHT')
+    CARD_WIDTH = get_config('CARD_WIDTH')
+    CARD_HEIGHT = get_config('CARD_HEIGHT')
+    MAP_WIDTH = get_config('MAP_WIDTH')
+    MAP_HEIGHT = get_config('MAP_HEIGHT')
+    
     mouse_x, mouse_y = event.pos
     
     # 检查是否点击在结束回合按钮上
@@ -42,6 +56,9 @@ def handle_mouse_button_up(event, game, dragging_card):
     if not dragging_card:
         return None
     
+    MAP_WIDTH = get_config('MAP_WIDTH')
+    MAP_HEIGHT = get_config('MAP_HEIGHT')
+    
     mouse_x, mouse_y = event.pos
     
     # 计算释放位置的格子坐标
@@ -56,6 +73,11 @@ def handle_mouse_button_up(event, game, dragging_card):
 
 def handle_keydown(event, game):
     """处理键盘按下事件"""
+    MONSTER_COUNT_MIN = get_config('MONSTER_COUNT_MIN')
+    MONSTER_COUNT_MAX = get_config('MONSTER_COUNT_MAX')
+    MAP_WIDTH = get_config('MAP_WIDTH')
+    MAP_HEIGHT = get_config('MAP_HEIGHT')
+    
     # 按R或r重新开始游戏
     if event.key == pygame.K_r or (hasattr(event, 'unicode') and event.unicode and event.unicode.lower() == 'r'):
         monster_count = random.randint(MONSTER_COUNT_MIN, MONSTER_COUNT_MAX)

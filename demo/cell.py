@@ -145,17 +145,13 @@ class TaskCell(Cell):
     
     def get_display_text(self):
         """获取显示文本"""
-        from config.task_config import TASK_TYPE_NAMES
-        
         if self.state == CellState.HIDDEN:
             return ""
         
-        # 已揭示状态
-        task_name = TASK_TYPE_NAMES.get(self.task_type, "任务")
-        
+        # 已揭示状态（只显示"任务"，不显示任务名称和描述）
         if self.task_claimed:
-            return f"任务\n{task_name}\n已确认"
+            return "任务\n已确认"
         elif self.task_completed:
-            return f"任务\n{task_name}\n已完成\n点击确认"
+            return "任务\n已完成\n点击确认"
         else:
-            return f"任务\n{task_name}"
+            return "任务"
