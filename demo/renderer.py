@@ -709,6 +709,110 @@ def draw_settings_panel(screen, mouse_pos, current_scale):
     }
 
 
+def draw_main_menu(screen, mouse_pos, difficulty_dropdown):
+    """
+    绘制主菜单界面
+    :param screen: 屏幕表面
+    :param mouse_pos: 鼠标位置
+    :param difficulty_dropdown: 难度下拉列表组件
+    :return: 字典，包含所有可点击元素的rect和类型
+    """
+    WINDOW_WIDTH = get_config('WINDOW_WIDTH')
+    WINDOW_HEIGHT = get_config('WINDOW_HEIGHT')
+    COLOR_BACKGROUND = get_config('COLOR_BACKGROUND')
+    COLOR_UI_BG = get_config('COLOR_UI_BG')
+    COLOR_UI_TEXT = get_config('COLOR_UI_TEXT')
+    BUTTON_COLOR = get_config('BUTTON_COLOR')
+    BUTTON_HOVER_COLOR = get_config('BUTTON_HOVER_COLOR')
+    BUTTON_TEXT_COLOR = get_config('BUTTON_TEXT_COLOR')
+    COLOR_TEXT = get_config('COLOR_TEXT')
+    
+    # 绘制背景
+    screen.fill(COLOR_BACKGROUND)
+    
+    # 计算主菜单面板位置（居中）
+    panel_width = int(WINDOW_WIDTH * 0.4)
+    panel_height = int(WINDOW_HEIGHT * 0.6)
+    panel_x = (WINDOW_WIDTH - panel_width) // 2
+    panel_y = (WINDOW_HEIGHT - panel_height) // 2
+    
+    # 绘制主菜单面板背景
+    panel_rect = pygame.Rect(panel_x, panel_y, panel_width, panel_height)
+    pygame.draw.rect(screen, COLOR_UI_BG, panel_rect)
+    pygame.draw.rect(screen, COLOR_UI_TEXT, panel_rect, 3)
+    
+    # 绘制标题
+    title_font_size = max(32, int(WINDOW_HEIGHT * 0.06))
+    title_font = get_chinese_font(title_font_size)
+    title_text = title_font.render("Magic Legion: Minefield Battle", True, COLOR_UI_TEXT)
+    title_rect = title_text.get_rect()
+    title_rect.centerx = panel_x + panel_width // 2
+    title_rect.y = panel_y + int(WINDOW_HEIGHT * 0.05)
+    screen.blit(title_text, title_rect)
+    
+    # 按钮配置
+    button_height = max(40, int(WINDOW_HEIGHT * 0.05))
+    button_margin = max(10, int(WINDOW_HEIGHT * 0.015))
+    button_width = int(panel_width * 0.7)
+    button_x = panel_x + (panel_width - button_width) // 2
+    
+    # 更新下拉列表位置（确保居中）
+    dropdown_width = int(panel_width * 0.7)
+    dropdown_height = max(40, int(WINDOW_HEIGHT * 0.05))
+    dropdown_x = panel_x + (panel_width - dropdown_width) // 2
+    dropdown_y = panel_y + int(WINDOW_HEIGHT * 0.15)
+    difficulty_dropdown.x = dropdown_x
+    difficulty_dropdown.y = dropdown_y
+    difficulty_dropdown.width = dropdown_width
+    difficulty_dropdown.height = dropdown_height
+    
+    # 难度选择区域
+    difficulty_y = dropdown_y
+    
+    # 难度标签
+    label_font_size = max(18, int(WINDOW_HEIGHT * 0.03))
+    label_font = get_chinese_font(label_font_size)
+    difficulty_label = label_font.render("难度:", True, COLOR_UI_TEXT)
+    screen.blit(difficulty_label, (button_x, difficulty_y - int(button_height * 1.2)))
+    
+    # 先绘制难度下拉列表的主按钮（不绘制选项）
+    dropdown_rect = difficulty_dropdown.draw_main_button(screen, mouse_pos)
+    
+    # 开始游戏按钮
+    start_y = difficulty_y + int(button_height * 1.5) + button_margin
+    start_rect = pygame.Rect(button_x, start_y, button_width, button_height)
+    is_hover_start = start_rect.collidepoint(mouse_pos)
+    start_color = BUTTON_HOVER_COLOR if is_hover_start else BUTTON_COLOR
+    pygame.draw.rect(screen, start_color, start_rect)
+    pygame.draw.rect(screen, COLOR_TEXT, start_rect, 2)
+    start_text = label_font.render("开始游戏", True, BUTTON_TEXT_COLOR)
+    start_text_rect = start_text.get_rect()
+    start_text_rect.center = start_rect.center
+    screen.blit(start_text, start_text_rect)
+    
+    # 设置按钮
+    settings_y = start_y + button_height + button_margin
+    settings_rect = pygame.Rect(button_x, settings_y, button_width, button_height)
+    is_hover_settings = settings_rect.collidepoint(mouse_pos)
+    settings_color = BUTTON_HOVER_COLOR if is_hover_settings else BUTTON_COLOR
+    pygame.draw.rect(screen, settings_color, settings_rect)
+    pygame.draw.rect(screen, COLOR_TEXT, settings_rect, 2)
+    settings_text = label_font.render("设置", True, BUTTON_TEXT_COLOR)
+    settings_text_rect = settings_text.get_rect()
+    settings_text_rect.center = settings_rect.center
+    screen.blit(settings_text, settings_text_rect)
+    
+    # 最后绘制下拉列表的选项（如果展开，确保在最上层）
+    if difficulty_dropdown.is_open:
+        difficulty_dropdown.draw_options(screen, mouse_pos)
+    
+    return {
+        'start': start_rect,
+        'settings': settings_rect,
+        'dropdown': dropdown_rect
+    }
+
+
 def draw_game_over_screen(screen, game):
     """绘制游戏结束界面"""
     if not game.game_over:
@@ -745,12 +849,38 @@ def draw_game_over_screen(screen, game):
     
     screen.blit(text_surface, text_rect)
     
-    # 提示按R重新开始
-    font_small = get_chinese_font(font_small_size)
+    # 返回主菜单按钮
+    BUTTON_COLOR = get_config('BUTTON_COLOR')
+    BUTTON_HOVER_COLOR = get_config('BUTTON_HOVER_COLOR')
+    BUTTON_TEXT_COLOR = get_config('BUTTON_TEXT_COLOR')
+    COLOR_TEXT = get_config('COLOR_TEXT')
+    
+    button_width = int(WINDOW_WIDTH * 0.15)
+    button_height = max(40, int(WINDOW_HEIGHT * 0.05))
+    button_x = WINDOW_WIDTH // 2 - button_width // 2
+    button_y = WINDOW_HEIGHT // 2 + max(60, int(WINDOW_HEIGHT * 0.08))
+    
+    # 获取鼠标位置（需要从外部传入，这里先假设在屏幕中心）
+    mouse_x, mouse_y = pygame.mouse.get_pos()
+    menu_button_rect = pygame.Rect(button_x, button_y, button_width, button_height)
+    is_hover_menu = menu_button_rect.collidepoint(mouse_x, mouse_y)
+    menu_button_color = BUTTON_HOVER_COLOR if is_hover_menu else BUTTON_COLOR
+    
+    pygame.draw.rect(screen, menu_button_color, menu_button_rect)
+    pygame.draw.rect(screen, COLOR_TEXT, menu_button_rect, 2)
+    
+    menu_text = font_small.render("返回主菜单", True, BUTTON_TEXT_COLOR)
+    menu_text_rect = menu_text.get_rect()
+    menu_text_rect.center = menu_button_rect.center
+    screen.blit(menu_text, menu_text_rect)
+    
+    # 提示按R重新开始（可选，保留）
     restart_text = font_small.render("按 R 键重新开始", True, COLOR_UI_TEXT)
     restart_rect = restart_text.get_rect()
     restart_rect.centerx = WINDOW_WIDTH // 2
     restart_offset = max(25, int(RESTART_TEXT_OFFSET_BASE * window_scale))
-    restart_rect.centery = WINDOW_HEIGHT // 2 + restart_offset
+    restart_rect.centery = button_y + button_height + restart_offset
     screen.blit(restart_text, restart_rect)
+    
+    return menu_button_rect
 

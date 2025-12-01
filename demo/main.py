@@ -13,6 +13,14 @@ import renderer
 import event_handler
 import utils
 import ui_helper
+from ui_components import Dropdown
+from enum import Enum
+
+# 游戏状态枚举
+class GameState(Enum):
+    MENU = "menu"          # 主菜单
+    PLAYING = "playing"    # 游戏中
+    SETTINGS = "settings"  # 设置界面
 
 # 初始导入函数
 draw_cell = renderer.draw_cell
@@ -26,6 +34,7 @@ draw_end_turn_button = renderer.draw_end_turn_button
 draw_game_over_screen = renderer.draw_game_over_screen
 draw_settings_button = renderer.draw_settings_button
 draw_settings_panel = renderer.draw_settings_panel
+draw_main_menu = renderer.draw_main_menu
 handle_mouse_button_down = event_handler.handle_mouse_button_down
 handle_mouse_button_up = event_handler.handle_mouse_button_up
 handle_keydown = event_handler.handle_keydown
@@ -47,12 +56,15 @@ def main():
     calculate_layout()
     
     screen = pygame.display.set_mode((ui_config.WINDOW_WIDTH, ui_config.WINDOW_HEIGHT))
-    pygame.display.set_caption("魔法军团：地雷战场")
+    pygame.display.set_caption("Magic Legion: Minefield Battle")
     clock = pygame.time.Clock()
     
-    # 创建游戏实例
-    monster_count = random.randint(config_mgr.MONSTER_COUNT_MIN, config_mgr.MONSTER_COUNT_MAX)
-    game = Game(config_mgr.MAP_WIDTH, config_mgr.MAP_HEIGHT, monster_count)
+    # 游戏状态
+    game_state = GameState.MENU
+    previous_state = None  # 用于从设置界面返回
+    
+    # 游戏实例（初始为None，在开始游戏时创建）
+    game = None
     
     # 拖拽状态
     dragging_card = None  # 当前拖拽的卡牌
@@ -60,8 +72,49 @@ def main():
     drag_offset_y = 0
     
     # 设置界面状态
-    show_settings = False
     settings_panel_rects = None
+    
+    # 主菜单组件
+    from config.difficulty_config import Difficulty, DIFFICULTY_CONFIGS
+    difficulty_options = [
+        (Difficulty.BEGINNER, DIFFICULTY_CONFIGS[Difficulty.BEGINNER]["name"]),
+        (Difficulty.INTERMEDIATE, DIFFICULTY_CONFIGS[Difficulty.INTERMEDIATE]["name"]),
+        (Difficulty.EXPERT, DIFFICULTY_CONFIGS[Difficulty.EXPERT]["name"])
+    ]
+    
+    # 初始化当前难度
+    config_mgr.current_difficulty = Difficulty.BEGINNER
+    
+    # 创建难度下拉列表
+    WINDOW_WIDTH = ui_config.WINDOW_WIDTH
+    WINDOW_HEIGHT = ui_config.WINDOW_HEIGHT
+    dropdown_width = int(WINDOW_WIDTH * 0.28)
+    dropdown_height = max(40, int(WINDOW_HEIGHT * 0.05))
+    dropdown_x = (WINDOW_WIDTH - dropdown_width) // 2
+    dropdown_y = int(WINDOW_HEIGHT * 0.4)
+    difficulty_dropdown = Dropdown(dropdown_x, dropdown_y, dropdown_width, dropdown_height, difficulty_options, 0)
+    
+    # 主菜单界面元素
+    menu_rects = None
+    
+    def create_new_game():
+        """根据当前难度创建新游戏"""
+        from config.difficulty_config import DIFFICULTY_CONFIGS
+        from config.game_config import get_monster_count
+        
+        # 更新地图配置
+        difficulty_config = DIFFICULTY_CONFIGS[config_mgr.current_difficulty]
+        config_mgr.MAP_WIDTH = difficulty_config["width"]
+        config_mgr.MAP_HEIGHT = difficulty_config["height"]
+        
+        # 重新计算布局
+        calculate_layout()
+        
+        # 获取地雷数量
+        monster_count = get_monster_count()
+        
+        # 创建游戏实例
+        return Game(config_mgr.MAP_WIDTH, config_mgr.MAP_HEIGHT, monster_count)
     
     running = True
     
@@ -74,22 +127,23 @@ def main():
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:  # 左键按下
-                    if show_settings:
+                    if game_state == GameState.SETTINGS:
                         # 处理设置界面点击
                         mouse_x, mouse_y = event.pos
                         
                         # 检查关闭按钮
                         if settings_panel_rects['close'].collidepoint(mouse_x, mouse_y):
-                            show_settings = False
+                            game_state = previous_state
+                            previous_state = None
                             settings_panel_rects = None
                             continue
                         
-                        # 检查重新开始按钮
-                        if settings_panel_rects['restart'].collidepoint(mouse_x, mouse_y):
-                            monster_count = random.randint(config_mgr.MONSTER_COUNT_MIN, config_mgr.MONSTER_COUNT_MAX)
-                            game = Game(config_mgr.MAP_WIDTH, config_mgr.MAP_HEIGHT, monster_count)
+                        # 检查重新开始按钮（只在游戏中有效）
+                        if previous_state == GameState.PLAYING and settings_panel_rects['restart'].collidepoint(mouse_x, mouse_y):
+                            game = create_new_game()
                             dragging_card = None
-                            show_settings = False
+                            game_state = previous_state
+                            previous_state = None
                             settings_panel_rects = None
                             continue
                         
@@ -110,14 +164,76 @@ def main():
                                     screen = pygame.display.set_mode((ui_config.WINDOW_WIDTH, ui_config.WINDOW_HEIGHT))
                                     # 重新计算布局（所有UI元素会自动适配新分辨率）
                                     calculate_layout()
+                                    # 更新下拉列表位置
+                                    dropdown_width = int(ui_config.WINDOW_WIDTH * 0.28)
+                                    dropdown_height = max(40, int(ui_config.WINDOW_HEIGHT * 0.05))
+                                    dropdown_x = (ui_config.WINDOW_WIDTH - dropdown_width) // 2
+                                    dropdown_y = int(ui_config.WINDOW_HEIGHT * 0.4)
+                                    difficulty_dropdown.x = dropdown_x
+                                    difficulty_dropdown.y = dropdown_y
+                                    difficulty_dropdown.width = dropdown_width
+                                    difficulty_dropdown.height = dropdown_height
                                 break
-                    else:
+                    elif game_state == GameState.MENU:
+                        # 处理主菜单点击
+                        mouse_x, mouse_y = event.pos
+                        
+                        # 处理难度下拉列表
+                        handled, new_difficulty = difficulty_dropdown.handle_click(mouse_x, mouse_y)
+                        if handled and new_difficulty is not None:
+                            config_mgr.current_difficulty = new_difficulty
+                            continue
+                        
+                        # 处理主菜单按钮
+                        if menu_rects:
+                            if menu_rects['start'].collidepoint(mouse_x, mouse_y):
+                                # 开始游戏
+                                game = create_new_game()
+                                dragging_card = None
+                                game_state = GameState.PLAYING
+                                continue
+                            elif menu_rects['settings'].collidepoint(mouse_x, mouse_y):
+                                # 打开设置
+                                previous_state = game_state
+                                game_state = GameState.SETTINGS
+                                continue
+                    elif game_state == GameState.PLAYING:
+                        # 处理游戏内事件
+                        mouse_x, mouse_y = event.pos
+                        
                         # 检查是否点击了设置按钮
                         settings_button_rect = pygame.Rect(ui_config.SETTINGS_BUTTON_X, ui_config.SETTINGS_BUTTON_Y, 
                                                           ui_config.SETTINGS_BUTTON_SIZE_SCALED, ui_config.SETTINGS_BUTTON_SIZE_SCALED)
-                        if settings_button_rect.collidepoint(event.pos):
-                            show_settings = True
+                        if settings_button_rect.collidepoint(mouse_x, mouse_y):
+                            previous_state = game_state
+                            game_state = GameState.SETTINGS
                             continue
+                        
+                        # 检查游戏结束界面的返回主菜单按钮
+                        if game and game.game_over:
+                            # 临时绘制以获取按钮rect
+                            from constants import BASE_WINDOW_WIDTH, BASE_WINDOW_HEIGHT, BASE_FONT_LARGE, BASE_FONT_SMALL, OVERLAY_ALPHA, RESTART_TEXT_OFFSET_BASE
+                            WINDOW_WIDTH = config_mgr.WINDOW_WIDTH
+                            WINDOW_HEIGHT = config_mgr.WINDOW_HEIGHT
+                            BUTTON_COLOR = config_mgr.BUTTON_COLOR
+                            BUTTON_HOVER_COLOR = config_mgr.BUTTON_HOVER_COLOR
+                            BUTTON_TEXT_COLOR = config_mgr.BUTTON_TEXT_COLOR
+                            COLOR_TEXT = config_mgr.COLOR_TEXT
+                            
+                            window_scale = min(WINDOW_WIDTH / BASE_WINDOW_WIDTH, WINDOW_HEIGHT / BASE_WINDOW_HEIGHT)
+                            font_small_size = max(12, int(BASE_FONT_SMALL * window_scale))
+                            
+                            button_width = int(WINDOW_WIDTH * 0.15)
+                            button_height = max(40, int(WINDOW_HEIGHT * 0.05))
+                            button_x = WINDOW_WIDTH // 2 - button_width // 2
+                            button_y = WINDOW_HEIGHT // 2 + max(60, int(WINDOW_HEIGHT * 0.08))
+                            menu_button_rect = pygame.Rect(button_x, button_y, button_width, button_height)
+                            
+                            if menu_button_rect.collidepoint(mouse_x, mouse_y):
+                                game = None
+                                game_state = GameState.MENU
+                                dragging_card = None
+                                continue
                         
                         # 处理游戏内事件
                         result = handle_mouse_button_down(event, game, dragging_card)
@@ -125,32 +241,40 @@ def main():
                             continue
                         dragging_card, drag_offset_x, drag_offset_y = result
             elif event.type == pygame.MOUSEBUTTONUP:
-                if event.button == 1 and not show_settings:  # 左键释放（设置界面打开时不处理）
+                if event.button == 1 and game_state == GameState.PLAYING:  # 左键释放（只在游戏中处理）
                     dragging_card = handle_mouse_button_up(event, game, dragging_card)
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:  # ESC键关闭设置界面
-                    if show_settings:
-                        show_settings = False
+                if event.key == pygame.K_ESCAPE:  # ESC键关闭设置界面或返回主菜单
+                    if game_state == GameState.SETTINGS:
+                        game_state = previous_state
+                        previous_state = None
                         settings_panel_rects = None
                         continue
-                if not show_settings:  # 设置界面打开时不处理其他按键
+                    elif game_state == GameState.PLAYING:
+                        previous_state = game_state
+                        game_state = GameState.SETTINGS
+                        continue
+                elif game_state == GameState.PLAYING:  # 游戏中的按键处理
                     new_game = handle_keydown(event, game)
                     if new_game != game:
                         game = new_game
                         dragging_card = None
         
         # 更新游戏状态
-        if not show_settings:
+        if game_state == GameState.PLAYING and game:
             game.update()
         
         # 绘制
         COLOR_BACKGROUND = config_mgr.COLOR_BACKGROUND
         screen.fill(COLOR_BACKGROUND)
         
-        if show_settings:
+        if game_state == GameState.SETTINGS:
             # 绘制设置界面
             settings_panel_rects = draw_settings_panel(screen, mouse_pos, ui_config.WINDOW_SCALE)
-        else:
+        elif game_state == GameState.MENU:
+            # 绘制主菜单
+            menu_rects = draw_main_menu(screen, mouse_pos, difficulty_dropdown)
+        elif game_state == GameState.PLAYING and game:
             # 绘制游戏界面
             # 绘制顶部血条
             draw_health_bar(screen, game)
@@ -207,10 +331,11 @@ def main():
             draw_end_turn_button(screen, mouse_pos)
             
             # 绘制游戏结束信息
-            draw_game_over_screen(screen, game)
+            if game.game_over:
+                draw_game_over_screen(screen, game)
         
-        # 绘制设置按钮（始终显示，在设置界面时会被覆盖）
-        if not show_settings:
+        # 绘制设置按钮（只在游戏中显示）
+        if game_state == GameState.PLAYING:
             draw_settings_button(screen, mouse_pos)
         
         pygame.display.flip()

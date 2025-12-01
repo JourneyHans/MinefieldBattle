@@ -9,6 +9,7 @@ from config import game_config
 from config import ui_config
 from config import card_config
 from config import task_config
+from config import difficulty_config
 
 # 从各个子配置模块导入所有配置项，重新导出以保持向后兼容
 
@@ -111,6 +112,14 @@ TASK_TYPE_DESCRIPTIONS = task_config.TASK_TYPE_DESCRIPTIONS
 COLOR_TASK = ui_config.COLOR_TASK
 COLOR_TASK_COMPLETED = ui_config.COLOR_TASK_COMPLETED
 COLOR_TASK_CLAIMED = ui_config.COLOR_TASK_CLAIMED
+
+# 难度配置
+Difficulty = difficulty_config.Difficulty
+DIFFICULTY_CONFIGS = difficulty_config.DIFFICULTY_CONFIGS
+DEFAULT_DIFFICULTY = difficulty_config.DEFAULT_DIFFICULTY
+
+# 当前难度状态（默认初级）
+current_difficulty = DEFAULT_DIFFICULTY
 
 # 导出布局计算函数
 calculate_layout = ui_config.calculate_layout
