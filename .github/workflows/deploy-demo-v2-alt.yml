@@ -1,0 +1,40 @@
+name: Deploy demo_v2 to gh-pages branch
+
+on:
+  push:
+    branches: [ feat/demo_v2 ]
+    paths:
+      - 'demo_v2/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: demo_v2/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./demo_v2
+        run: npm ci
+
+      - name: Build
+        working-directory: ./demo_v2
+        run: npm run build
+
+      - name: Deploy to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./demo_v2/dist
+          destination_dir: demo_v2
