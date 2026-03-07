@@ -7,6 +7,9 @@ on:
       - 'demo_v2/**'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -27,7 +30,8 @@ jobs:
           npm run build
 
       - name: Deploy to GitHub Pages
-        working-directory: ./demo_v2
-        run: npm run deploy
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./demo_v2/dist
+          destination_dir: demo_v2
