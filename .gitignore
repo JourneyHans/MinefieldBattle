@@ -1,4 +1,27 @@
-﻿demo/__pycache__
+﻿# Python demo
+demo/__pycache__
 demo/build
 demo/dist
 demo/config/__pycache__
+
+# Node.js / demo_v2
+demo_v2/node_modules/
+demo_v2/dist/
+demo_v2/.env
+demo_v2/.env.local
+demo_v2/.env.*.local
+demo_v2/npm-debug.log*
+demo_v2/yarn-debug.log*
+demo_v2/yarn-error.log*
+demo_v2/pnpm-debug.log*
+demo_v2/.DS_Store
+demo_v2/.idea
+demo_v2/.vscode
+demo_v2/*.suo
+demo_v2/*.ntvs*
+demo_v2/*.njsproj
+demo_v2/*.sln
+demo_v2/*.sw?
+
+# Claude
+.claude/

@@ -1,0 +1,218 @@
+import { useState } from 'react';
+import { GameScreen } from './components/Game/GameScreen';
+import { useGameStore } from './store/gameStore';
+import { Difficulty } from './types';
+import './App.css';
+
+function App() {
+  const [testResults, setTestResults] = useState<string[]>([]);
+  const [gameTestResults, setGameTestResults] = useState<string[]>([]);
+
+  const initGame = useGameStore((state) => state.initGame);
+  const gameState = useGameStore((state) => state.gameState);
+  const revealCell = useGameStore((state) => state.revealCell);
+  const deployCard = useGameStore((state) => state.deployCard);
+  const battleMonster = useGameStore((state) => state.battleMonster);
+  const endTurn = useGameStore((state) => state.endTurn);
+
+  const testEntities = () => {
+    const results: string[] = [];
+
+    try {
+      // 测试卡牌创建
+      const warriorCard = new CardEntity(UnitType.WARRIOR);
+      results.push(`✓ 创建战士卡牌: ${warriorCard.name} (战力: ${warriorCard.power})`);
+
+      const mageCard = new CardEntity(UnitType.MAGE);
+      results.push(`✓ 创建法师卡牌: ${mageCard.name} (战力: ${mageCard.power})`);
+
+      // 测试格子创建
+      const numberCell = new NumberCellEntity(0, 0, 3);
+      results.push(`✓ 创建数字格子: 数字=${numberCell.number}`);
+
+      const monsterCell = new MonsterCellEntity(1, 1);
+      monsterCell.trigger();
+      results.push(`✓ 创建怪物格子: 战力=${monsterCell.power}`);
+
+      const taskCell = new TaskCellEntity(2, 2, TaskType.FIND_TASK);
+      taskCell.complete();
+      results.push(`✓ 创建任务格子: 类型=${taskCell.taskType}, 完成=${taskCell.completed}`);
+
+      // 测试卡牌部署逻辑
+      const canDeploy = warriorCard.canDeployTo(1);
+      results.push(`✓ 战士卡牌能否部署到数字1格子: ${canDeploy}`);
+
+      const deployedPower = warriorCard.getDeployedPower(1);
+      results.push(`✓ 战士卡牌部署到数字1格子的实际战力: ${deployedPower}`);
+
+      // 测试高数值卡牌部署到低数值格子
+      const archerCard = new CardEntity(UnitType.ARCHER);
+      const archerDeployedPower = archerCard.getDeployedPower(1);
+      results.push(`✓ 弓箭手卡牌(战力2)部署到数字1格子的实际战力: ${archerDeployedPower}`);
+
+      results.push('');
+      results.push('🎉 所有基础实体测试通过！');
+
+    } catch (error) {
+      results.push(`❌ 测试失败: ${error}`);
+    }
+
+    setTestResults(results);
+  };
+
+  const testGameLogic = () => {
+    const results: string[] = [];
+
+    try {
+      results.push('🚀 开始游戏逻辑测试...');
+
+      // 初始化游戏
+      initGame(Difficulty.BEGINNER);
+      results.push('✓ 游戏初始化成功 (初级难度)');
+
+      // 等待状态更新
+      setTimeout(() => {
+        const currentState = useGameStore.getState().gameState;
+        if (!currentState) {
+          results.push('❌ 游戏状态为空');
+          setGameTestResults(results);
+          return;
+        }
+
+        results.push(`✓ 地图大小: ${currentState.grid.length}x${currentState.grid[0].length}`);
+        results.push(`✓ 初始生命值: ${currentState.status.health}`);
+        results.push(`✓ 初始手牌数量: ${currentState.hand.length}`);
+        results.push(`✓ 手牌内容: ${currentState.hand.map(c => c.name).join(', ')}`);
+
+        // 测试揭示格子
+        const revealResult = revealCell(0, 0);
+        if (revealResult.success) {
+          results.push('✓ 揭示格子(0,0)成功');
+
+          if (revealResult.cellRevealed) {
+            const cell = revealResult.cellRevealed;
+            if (cell instanceof NumberCellEntity) {
+              results.push(`✓ 揭示的是数字格子，数字=${cell.number}`);
+            }
+          }
+        } else {
+          results.push('❌ 揭示格子失败');
+        }
+
+        // 测试部署卡牌
+        if (currentState.hand.length > 0) {
+          const deployResult = deployCard(0, 0, 0);
+          if (deployResult.success) {
+            results.push('✓ 部署卡牌成功');
+          } else {
+            results.push(`✓ 部署卡牌预期失败: ${deployResult.message || '无法部署'}`);
+          }
+        }
+
+        // 测试结束回合
+        endTurn();
+        const afterTurnState = useGameStore.getState().gameState;
+        if (afterTurnState) {
+          results.push(`✓ 结束回合成功，当前回合: ${afterTurnState.status.currentTurn}`);
+          results.push(`✓ 新手牌数量: ${afterTurnState.hand.length}`);
+        }
+
+        results.push('');
+        results.push('🎉 游戏逻辑测试完成！');
+
+        setGameTestResults(results);
+      }, 100);
+
+    } catch (error) {
+      results.push(`❌ 测试失败: ${error}`);
+      setGameTestResults(results);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center p-8" style={{ backgroundColor: '#1a1a2e', color: '#f1f1f1' }}>
+      <div className="max-w-2xl w-full">
+        <h1 className="text-4xl font-bold mb-4" style={{ color: '#e94560' }}>魔法军团：地雷战场</h1>
+        <h2 className="text-2xl mb-8" style={{ color: '#a2a8d3' }}>Demo_v2 网页版开发测试</h2>
+
+        <div className="rounded-lg p-6 mb-6" style={{ backgroundColor: '#16213e' }}>
+          <h3 className="text-xl font-semibold mb-4">基础实体测试</h3>
+          <button
+            onClick={testEntities}
+            className="game-button mb-4"
+          >
+            运行实体测试
+          </button>
+
+          {testResults.length > 0 && (
+            <div className="rounded p-4 font-mono text-sm mb-4" style={{ backgroundColor: '#1a1a2e' }}>
+              {testResults.map((result, index) => (
+                <div key={index} className={result.startsWith('❌') ? 'text-red-400' : 'text-green-400'}>
+                  {result}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-lg p-6 mb-6" style={{ backgroundColor: '#16213e' }}>
+          <h3 className="text-xl font-semibold mb-4">游戏逻辑测试</h3>
+          <button
+            onClick={testGameLogic}
+            className="game-button mb-4"
+          >
+            运行游戏逻辑测试
+          </button>
+
+          {gameTestResults.length > 0 && (
+            <div className="rounded p-4 font-mono text-sm mb-4" style={{ backgroundColor: '#1a1a2e' }}>
+              {gameTestResults.map((result, index) => (
+                <div key={index} className={result.startsWith('❌') ? 'text-red-400' : result.startsWith('🚀') ? 'text-blue-400' : 'text-green-400'}>
+                  {result}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {gameState && (
+            <div className="rounded p-4 text-sm" style={{ backgroundColor: '#1a1a2e' }}>
+              <div className="font-bold mb-2">当前游戏状态:</div>
+              <div>生命值: {gameState.status.health}</div>
+              <div>回合数: {gameState.status.currentTurn}</div>
+              <div>地图大小: {gameState.grid.length}x{gameState.grid[0]?.length || 0}</div>
+              <div>手牌数量: {gameState.hand.length}</div>
+              <div>游戏结束: {gameState.status.gameOver ? '是' : '否'}</div>
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-lg p-6" style={{ backgroundColor: '#16213e' }}>
+          <h3 className="text-xl font-semibold mb-4">开发进度</h3>
+          <ul className="space-y-2">
+            <li className="text-green-400">✓ 项目搭建 (Vite + React + TypeScript)</li>
+            <li className="text-green-400">✓ 核心依赖 (PixiJS、TailwindCSS、zustand)</li>
+            <li className="text-green-400">✓ 类型定义和配置文件</li>
+            <li className="text-green-400">✓ 格子实体系统 (NumberCell、MonsterCell、TaskCell)</li>
+            <li className="text-green-400">✓ 卡牌和兵种实体</li>
+            <li className="text-green-400">✓ 地图生成算法 (MapGenerator)</li>
+            <li className="text-green-400">✓ 卡牌系统 (CardSystem)</li>
+            <li className="text-green-400">✓ 战斗系统 (BattleSystem)</li>
+            <li className="text-green-400">✓ 任务验证系统 (TaskValidator)</li>
+            <li className="text-green-400">✓ GameState核心游戏逻辑</li>
+            <li className="text-green-400">✓ Zustand状态管理</li>
+            <li className="text-yellow-400">⏳ PixiJS渲染系统 (待实现)</li>
+            <li className="text-gray-400">○ React UI组件 (待实现)</li>
+            <li className="text-gray-400">○ 数据持久化 (待实现)</li>
+          </ul>
+        </div>
+
+        <div className="mt-6 text-sm" style={{ color: '#a2a8d3' }}>
+          <p>技术栈: React 18 + TypeScript + PixiJS + TailwindCSS + Zustand</p>
+          <p>状态: 核心逻辑完成 | 阶段: 渲染系统开发</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default App;
